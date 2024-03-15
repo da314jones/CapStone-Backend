@@ -1,0 +1,44 @@
+{
+  "name": "capstone-back-end",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Capstone 2024 Tidbits",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "nodemon server.js",
+    "db_schema": "psql -U postgres -f db/schema.sql",
+    "db_seed": "psql -U postgres -f db/seed.sql"
+  },
+  "keywords": [],
+  "author": "Team Tidbits",
+  "license": "ISC",
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.529.1",
+    "@aws-sdk/lib-storage": "^3.529.1",
+    "@aws-sdk/s3-request-presigner": "^3.529.1",
+    "admin": "^1.4.1",
+    "aws": "^0.0.3-2",
+    "aws-sdk": "^2.1574.0",
+    "bcrypt": "^5.1.1",
+    "bcryptjs": "^2.4.3",
+    "configure": "^0.0.1",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.18.2",
+    "firebase": "^10.8.1",
+    "firebase-admin": "^12.0.0",
+    "morgan": "^1.10.0",
+    "multer": "^1.4.5-lts.1",
+    "node-pg-migrate": "^6.2.2",
+    "nodemailer": "^6.9.10",
+    "opentok": "^2.17.1",
+    "pg": "^8.11.3",
+    "pg-promise": "^11.5.4",
+    "sdk": "^0.1.1"
+  },
+  "devDependencies": {
+    "jest": "^29.7.0",
+    "nodemon": "^3.1.0"
+  }
+}
