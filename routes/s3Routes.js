@@ -7,7 +7,7 @@ import {
   listFiles,
   // generateUploadPresignedUrl,
   // generateDownloadPresignedUrl,
-} from "../controllers/s3Controller.js"; // Adjusted import
+} from "../controller/s3Controller.js"; // Adjusted import
 import upload from "./uploadMiddleware.js";
 
 // s3.get("/download-url/:fileName", generateDownloadPresignedUrl);

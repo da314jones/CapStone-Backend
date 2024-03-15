@@ -25,7 +25,7 @@ app.get("/", (req, res) => {
 
 // Added for the S3 upload route
 import s3Routes from "./routes/s3Routes.js";
-import users from "./controllers/usersControllers.js";
+import users from "./controller/usersController.js"
 import videoRoutes from "./routes/videoRoutes.js";
 
 app.use("/s3", s3Routes);

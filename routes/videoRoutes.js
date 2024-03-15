@@ -1,5 +1,5 @@
 import express from "express";
-import videoController from "../controllers/videoController.js";
+import videoController from "../controller/videoController.js";
 const videos = express.Router();
 
 videos.post("/session", videoController.creatingSession);
