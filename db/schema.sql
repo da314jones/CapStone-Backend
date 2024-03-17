@@ -7,9 +7,9 @@ CREATE DATABASE tidbits_dev;
 -- Recreate the users table
 CREATE TABLE users (
     id SERIAL PRIMARY KEY,
-    firstName VARCHAR(255),
-    lastName VARCHAR(255),
-    email VARCHAR(255) UNIQUE NOT NULL,
+    "firstName" VARCHAR(255),
+    "lastName" VARCHAR(255),
+    "email" VARCHAR(255) UNIQUE NOT NULL,
     photo_url VARCHAR(255),
     firebase_uid VARCHAR(255) NOT NULL UNIQUE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
@@ -20,7 +20,7 @@ CREATE TABLE videos (
     user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
     title VARCHAR(255) NOT NULL,
     summary TEXT,
-    -- ai_summary TEXT,
+    ai_summary TEXT,
     video_url VARCHAR(255) NOT NULL, -- URL from S3
     is_private BOOLEAN, -- Privacy setting for the video
     -- s3_key VARCHAR(255) NOT NULL, -- To identify the file in S3 bucket

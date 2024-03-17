@@ -1,6 +1,9 @@
+\c tidbits_dev
+
 -- Seed data for the users table
-INSERT INTO users (firstName, lastName, email, firebase_uid, created_at) VALUES
-('Renee', 'Smith', 'user1@example.com', 'firebaseuid1');
+INSERT INTO users ("firstName", "lastName", "email", "photo_url", "firebase_uid", created_at) VALUES
+('Renee', 'Smith', 'user1@example.com', 'null', 'firebaseuid1', NOW()),
+('Furious', 'Jones', 'user2@example.com', 'null', 'firebaseuid2', NOW());
 
 
 -- Since user_id references are to be consistent, ensure the user IDs match actual IDs in users table.
