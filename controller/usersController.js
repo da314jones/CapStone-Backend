@@ -36,16 +36,16 @@ import { getUserByEmail, createUser, removeUserByEmail } from "../queries/users.
 // registration Endpoint
 users.post("/new-user", async (req, res) => {
   const { firstName, lastName, email, photo_url, uid } = req.body;
-  // console.log({ firstName, lastName, email, photo_url, uid });
+  console.log({ firstName, lastName, email, photo_url, uid });
   try {
     const existingUser = await getUserByEmail(email);
     if (!existingUser) {
       const newUser = await createUser({
-        firstName: "firstName",
-        lastName: "lastName",
-        email: "email",
+        firstName,
+        lastName,
+        email,
         photo_url,
-        firebase_uid: "uid",
+        firebase_uid: uid,
       });
       console.log(newUser)
       return res
