@@ -3,7 +3,7 @@ import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 
 const users = express.Router();
-import { getUserByEmail, createUser, getAllUsers } from "../queries/users.js";
+import { getUserByEmail, createUser, removeUserByEmail } from "../queries/users.js";
 
 
 
@@ -89,5 +89,6 @@ users.post("/login", async (req, res) => {
     res.status(500).json({ message: "Error logging in." });
   }
 });
+
 
 export default users;
