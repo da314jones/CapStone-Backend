@@ -5,6 +5,8 @@ import jwt from "jsonwebtoken";
 const users = express.Router();
 import { getUserByEmail, createUser, removeUserByEmail } from "../queries/users.js";
 
+
+
 // users.post('/authenticate', async (req, res) => {
 //     const { token } = req.body;
 
@@ -32,20 +34,26 @@ import { getUserByEmail, createUser, removeUserByEmail } from "../queries/users.
 // });
 
 // registration Endpoint
-users.post('/new-user', async (req, res) => {
+users.post("/new-user", async (req, res) => {
   const { firstName, lastName, email, photo_url, uid } = req.body;
-  console.log({ firstName, lastName, email, photo_url, uid })
+  // console.log({ firstName, lastName, email, photo_url, uid });
   try {
     const existingUser = await getUserByEmail(email);
-    if (existingUser) {
-      return res.status(409).json({ message: 'User already exists.' });
-      console.log('New User already exist:', existingUser)
+    if (!existingUser) {
+      const newUser = await createUser({
+        firstName: "firstName",
+        lastName: "lastName",
+        email: "email",
+        photo_url,
+        firebase_uid: "uid",
+      });
+      console.log(newUser)
+      return res
+      .status(201)
+      .json({ message: "User created successfully", user: newUser });
     } else {
-      const newUser = await createUser({ firstName, lastName, email, photo_url, firebase_uid: uid });
-      console.log('New user created:', newUser)
-    return res.status(201).json({ message: 'User created successfully', user: newUser });
+      return res.status(409).json({ message: "User already exists." });
     }
-
   } catch (error) {
     res.status(500).json({ message: error.message });
   }

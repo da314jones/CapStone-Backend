@@ -11,7 +11,7 @@ CREATE TABLE users (
     "lastName" VARCHAR(255),
     "email" VARCHAR(255) UNIQUE NOT NULL,
     photo_url VARCHAR(255),
-    firebase_uid VARCHAR(255) NOT NULL UNIQUE,
+    "firebase_uid" VARCHAR(255) NOT NULL UNIQUE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
