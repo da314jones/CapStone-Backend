@@ -1,16 +1,12 @@
 import { db } from "../db/dbConfig.js";
 
-const createUser = async ({ firstName, lastName, email, photoURL, uid }) => {
+const createUser = async ({ firstName, lastName, email, photo_url, firebase_uid }) => {
   try {
-    const oneUser = await db.one(
-      "INSERT INTO users (firstName, lastName, email, photo_url, firebase_uid) VALUES ($1, $2, $3, $4, $5) RETURNING *",
-      [firstName, lastName, email, photoURL, uid]
-    );
-    return oneUser;
-    console.log(oneUser);
+    return await db.one(
+      `INSERT INTO users ("firstName", "lastName", "email", photo_url, "firebase_uid") VALUES ($1, $2, $3, $4, $5) RETURNING *`,
+      [firstName, lastName, email, photo_url, firebase_uid]);
   } catch (error) {
-    console.error("Error failed to fetch one user:", error);
-    throw error;
+    throw new Error(`Error creating user: ${error}`);
   }
 };
 
@@ -20,8 +16,8 @@ const getUserByEmail = async (email) => {
       "SELECT * FROM users WHERE email = $1",
       [email]
     );
-    return userByEmail;
     console.log(userByEmail);
+    return userByEmail;
   } catch (error) {
     console.error("Error fetching user by email:", error);
     throw error;
@@ -31,6 +27,7 @@ const getUserByEmail = async (email) => {
 const getAllUsers = async () => {
   try {
     const allUsers = await db.any("SELECT * FROM users");
+    console.log(allUsers)
     return allUsers;
   } catch (error) {
     console.error("Error fetching users:", error);
