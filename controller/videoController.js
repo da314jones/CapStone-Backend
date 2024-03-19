@@ -90,8 +90,6 @@ export const generatingToken = async (req, res) => {
       data: "example_data",
     });
     console.log("Token generated:", token);
-    const user = req.body
-    console.log(user)
     res.json({ token });
   } catch (error) {
     console.error("Error generating token:", error);

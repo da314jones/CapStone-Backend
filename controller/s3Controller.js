@@ -46,16 +46,16 @@ const s3Client = new S3Client({
 //     }));
 //   } catch (error) {
 //     console.error("Error listing files by user ID:", error);
-//     throw error; 
+//     throw error;
 //   }
 // };
 
 const uploadFile = async (req, res) => {
   const { file } = req;
   const userId = req.body.userId;
-  const title = req.body.title || 'Untitled';
+  const title = req.body.title || "Untitled";
   const summary = req.body.summary || "";
-  const isPrivate = req.body.isPrivate === 'true';
+  const isPrivate = req.body.isPrivate === "true";
   const duration = parseInt(req.body.duration) || 0;
 
   const fileStream = fs.createReadStream(file.path);
@@ -66,7 +66,7 @@ const uploadFile = async (req, res) => {
     Body: fileStream,
     ContentType: file.mimetype,
     Metadata: {
-      userId: userId.toString()
+      userId: userId.toString(),
     }, // Assuming mimetype is provided by multer
   };
 
@@ -78,14 +78,14 @@ const uploadFile = async (req, res) => {
     }.amazonaws.com/${encodeURIComponent(params.Key)}`;
     const video = await createVideo({
       userId,
-      title: req.body.title || 'Untitled',
-      summary: req.body.summary || '',
+      title: req.body.title || "Untitled",
+      summary: req.body.summary || "",
       video_url: fileUrl,
       isPrivate: req.body.isPrivate || false,
       duration: req.body.duration || 0,
-    })
+    });
     const newVideo = await createVideo(videoData);
-    
+
     fs.unlink(file.path, (err) => {
       if (err) {
         console.error("Failed to delete temporary file:", err);
@@ -93,9 +93,16 @@ const uploadFile = async (req, res) => {
     }); // Cleans up the uploaded file from temporary storage
     if (req.file) {
       console.log("Uploading file:", req.file.originalname);
-      res.status(200).json({ message: "Video uploaded successfully", url: fileUrl, userId, file: req.file.originalname });
-    }else {
-      res.status(400).json({ message: 'No File uploaded' })
+      res
+        .status(200)
+        .json({
+          message: "Video uploaded successfully",
+          url: fileUrl,
+          userId,
+          file: req.file.originalname,
+        });
+    } else {
+      res.status(400).json({ message: "No File uploaded" });
     }
   } catch (err) {
     console.error("Error uploading file:", err);
@@ -201,12 +208,10 @@ const listFiles = async (req, res) => {
         };
       })
     );
-    res
-      .status(200)
-      .json({
-        message: "Successfully retrieved bucket list:",
-        videoWithSignedUrls,
-      });
+    res.status(200).json({
+      message: "Successfully retrieved bucket list:",
+      videoWithSignedUrls,
+    });
   } catch (error) {
     console.error("Error listing files:", error);
     res.status(500).json({ message: "Error listing files from S3" });
