@@ -2,8 +2,6 @@
 import multer from "multer";
 import path from "path";
 import { fileURLToPath } from "url";
-const fs = require('fs');
-const https = require('https');
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -21,9 +19,5 @@ const storage = multer.diskStorage({
 
 // Create multer upload middleware
 const upload = multer({ storage: storage });
-
-
-const archiveUrl = 'ARCHIVE_VIDEO_URL';
-const filePath = ''
 
 export default upload;
