@@ -52,7 +52,11 @@ const s3Client = new S3Client({
 
 const uploadFile = async (req, res) => {
   const { file } = req;
-  const userId = req.body.userId;
+  const metaDataObject = req.body;
+  if (!metaDataObject.user_id) {
+    return res.status(400).json({ message: "user_id is required" });
+  }
+  const user_id = req.body.user_id;
   const title = req.body.title || "Untitled";
   const summary = req.body.summary || "";
   const isPrivate = req.body.isPrivate === "true";
@@ -62,11 +66,11 @@ const uploadFile = async (req, res) => {
 
   const params = {
     Bucket: process.env.BUCKET_NAME,
-    Key: `users/${userId}/${file.originalname}`,
+    Key: `users/${user_id}/${file.originalname}`,
     Body: fileStream,
     ContentType: file.mimetype,
     Metadata: {
-      userId: userId.toString(),
+      user_id: user_id.toString(),
     }, // Assuming mimetype is provided by multer
   };
 
@@ -77,14 +81,14 @@ const uploadFile = async (req, res) => {
       process.env.AWS_REGION
     }.amazonaws.com/${encodeURIComponent(params.Key)}`;
     const video = await createVideo({
-      userId,
+      user_id,
       title: req.body.title || "Untitled",
       summary: req.body.summary || "",
       video_url: fileUrl,
       isPrivate: req.body.isPrivate || false,
       duration: req.body.duration || 0,
     });
-    const newVideo = await createVideo(videoData);
+    const newVideo = await createVideo(video);
 
     fs.unlink(file.path, (err) => {
       if (err) {
@@ -93,14 +97,12 @@ const uploadFile = async (req, res) => {
     }); // Cleans up the uploaded file from temporary storage
     if (req.file) {
       console.log("Uploading file:", req.file.originalname);
-      res
-        .status(200)
-        .json({
-          message: "Video uploaded successfully",
-          url: fileUrl,
-          userId,
-          file: req.file.originalname,
-        });
+      res.status(200).json({
+        message: "Video uploaded successfully",
+        url: fileUrl,
+        user_id,
+        file: req.file.originalname,
+      });
     } else {
       res.status(400).json({ message: "No File uploaded" });
     }

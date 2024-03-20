@@ -38,6 +38,7 @@ users.post("/new-user", async (req, res) => {
   const { firstName, lastName, email, photo_url, uid } = req.body;
   console.log({ firstName, lastName, email, photo_url, uid });
   try {
+    debugger
     const existingUser = await getUserByEmail(email);
     if (!existingUser) {
       const newUser = await createUser({
@@ -45,7 +46,7 @@ users.post("/new-user", async (req, res) => {
         lastName,
         email,
         photo_url,
-        firebase_uid: uid,
+        user_id: uid,
       });
       console.log(newUser)
       return res
@@ -55,7 +56,8 @@ users.post("/new-user", async (req, res) => {
       return res.status(409).json({ message: "User already exists." });
     }
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    console.loerror('Error processing /new-user request:', error);
+    res.status(500).json({ message: 'Internal Server Error', error: error.toString() });
   }
 });
 

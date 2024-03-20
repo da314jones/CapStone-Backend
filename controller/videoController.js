@@ -47,19 +47,16 @@ const videoById = async (req, res) => {
 };
 
 const createVideoMetadata = async (req, res, next) => {
+  const metaDataObject = req.body;
   try {
-    console.log("received video metadata:", req.body);
-    const newVideo = await createVideo(req.body);
+    const newVideo = await createVideo(metaDataObject);
+    console.log("Recieved video metadata:", metaDataObject);
     return res.status(201).json(newVideo);
   } catch (error) {
-    console.error("error saving video details to database:", error);
-    if (!res.headersSent) {
-      res.status(500).json("Error saving video details.");
-    } else {
-      next(error);
-    }
-  }
-};
+    console.error("Error saving metaDataObject to database:", error);
+    res.status(500).json({ message: 'Error saving metaDataObject.' })
+    } 
+  };
 
 const s3Client = new S3Client({
   region: process.env.AWS_REGION,
@@ -149,7 +146,7 @@ const stopVideoRecording = async (req, res) => {
     return res.status(400).json({ message: "archiveId is required" });
   }
 
-  opentok.stopArchive(archiveId, (error, archive) => {
+  opentok.stopArchive(archiveId, async (error, archive) => {
     if (error) {
       console.error("[stopVideoRecording] OpenTok stopArchive error:", error);
       return res.status(500).json({
@@ -157,14 +154,8 @@ const stopVideoRecording = async (req, res) => {
         error: error.message || "Internal Server Error",
       });
     }
-    console.log(
-      "[stopVideoRecording] Recording stopped successfully:",
-      archive.id
-    );
-    res.json({
-      message: "Recording stopped successfully",
-      archiveId: archive.id,
-    });
+    console.log('[stopVideoRecording] recording stopped successfully:', archive.id);
+    res.json({ message: 'Recording stopped successfully', archiveId: archive.id })
   });
 };
 
@@ -186,39 +177,6 @@ export const getArchive = (archiveId) => {
   });
 };
 
-const uploadVideo = async (req, res) => {
-  const archiveId = req.body.archiveId;
-
-  opentok.getArchive(archiveId, async (error, archive) => {
-    if (error) {
-      return res.status(500).json(error);
-    }
-    if (!archive.url) {
-      return res.status(400).json("Archive URL not available");
-    }
-
-    const response = await fetch(archive.url);
-    if (!response.ok) {
-      return res.status(500).json("Failed to download archive");
-    }
-
-    const fileName = `${archiveId}.mp4`;
-    const s3Params = {
-      Bucket: process.env.AWS_S3_BUCKET_NAME,
-      Key: `recordings/${fileName}`,
-      Body: response.body, // Stream directly to S3
-      ContentType: "video/mp4",
-    };
-
-    try {
-      await s3Client.json(new PutObjectCommand(s3Params));
-      res.json({ message: "Tidbit uploaded successfully", fileName });
-    } catch (s3Err) {
-      console.error("Error uploading to S3:", s3Err);
-      return res.status(500).json("Error uploading tidbit to S3.");
-    }
-  });
-};
 
 const updateVideoMetadata = async (req, res) => {
   const videoId = req.params.id;
@@ -279,7 +237,7 @@ export default {
   generatingToken,
   startVideoRecording,
   stopVideoRecording,
-  uploadVideo,
+  // uploadVideo,
   updateVideoMetadata,
   deleteVideoMetadata,
   // listFiles,
