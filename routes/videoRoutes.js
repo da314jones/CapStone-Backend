@@ -12,7 +12,7 @@ videos.post("/start-recording", videoController.startVideoRecording);
 
 videos.post("/stop-recording", videoController.stopVideoRecording);
 
-videos.post("/upload-recording", videoController.uploadVideo);
+// videos.post("/upload-recording", videoController.uploadVideo);
 
 // videos.get ('/list', videoController.listFiles)
 

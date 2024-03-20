@@ -18,16 +18,20 @@ const getVideoById = async (id) => {
   }
 };
 
-const createVideo = async (video) => {
-  const { userId, title, summary, video_url, isPrivate, duration } = video;
+const createVideo = async (video, idOnly) => {
+  console.log("Attempting to create video with data:", video);
+
+  const { user_id, title, summary, signed_url, isPrivate, duration, archive_id } = video;
   try {
-    console.log({video})
-    console.log({video_url})
-    const createdVideo = await db.one(
-      "INSERT INTO videos (user_id, title, summary, video_url, is_private, duration) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *",
-      [userId, title, summary, video_url, isPrivate, duration]
-    );
-    console.log("Video created:", createVideo);
+    console.log("Received video metadata:", video)
+    let query = "";
+    if (idOnly) {
+    query = "INSERT INTO videos (user_id, title, summary, signed_url, is_private, duration, archive_id) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id";
+    } else {
+      query = "INSERT INTO videos (user_id, title, summary, signed_url, is_private, duration, archive_id) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *";
+    }
+    const createdVideo = await db.one(query, [user_id, title, summary, signed_url, isPrivate, duration, archive_id]);
+    console.log("Video created:", createdVideo);
     return createdVideo;
   } catch (error) {
     console.error("Error creating video", error);
@@ -37,14 +41,14 @@ const createVideo = async (video) => {
 
 const updateVideo = async (id, video) => {
   try {
-    const { user_id, title, summary, video_url, duration, created_at } = video;
+    const { firebase_uid, title, summary, signed_url, duration, created_at } = video;
     const updatedVideo = await db.one(
-      "UPDATE videos SET user_id=$1, title=$2, summary=$3, video_url=$4, duration=$5, created_at=$6 WHERE id=$7 RETURNING *",
+      "UPDATE videos SET firebase_uid=$1, title=$2, summary=$3, signed_url=$4, duration=$5, created_at=$6 WHERE id=$7 RETURNING *",
       [
-        video.user_id,
+        video.firebase_uid,
         video.title,
         video.summary,
-        video.video_url,
+        video.signed_url,
         video.is_private,
         video.duration,
         video.created_at,
