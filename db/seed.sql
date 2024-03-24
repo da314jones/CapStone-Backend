@@ -8,6 +8,6 @@ INSERT INTO users ("user_id", "firstName", "lastName", "email", "photo_url", cre
 
 -- Since user_id references are to be consistent, ensure the user IDs match actual IDs in users table.
 -- For demonstration, assuming IDs 1 and 2 exist. Adjust if different.
-INSERT INTO videos (user_id, archive_id, category, title, summary, ai_summary, signed_url, is_private, s3_key, duration, created_at, updated_at) VALUES
-('firebaseuid1', '7026e2a4-2615-4ee9-8e10-2b8412764c6f', 'The Nature of Code', 'An introduction to coding simulations of natural systems.', 'Comprehensive overview on simulating natural systems through code.', 'AI summary for The Nature of Code', 'http://example.com/the-nature-of-code.mp4', true, 'nature_of_code.mp4', 3600, NOW(), NOW()),
-('firebaseuid2', 'ef15c1a7-1b69-4d35-92fc-9c75cd8e1093', 'AI for Everyone', 'A beginner’s guide to understanding AI and its implications.', 'Insightful summary on the basics of AI and its impact.', 'AI summary for AI for Everyone', 'http://example.com/ai-for-everyone.mp4', false, 'ai_for_everyone.mp4', 5400, NOW(), NOW());
+INSERT INTO videos (user_id, archive_id, category, title, summary, ai_summary, signed_url, is_private, s3_key, created_at, updated_at) VALUES
+('firebaseuid1', '7026e2a4-2615-4ee9-8e10-2b8412764c6f', 'The Nature of Code', 'An introduction to coding simulations of natural systems.', 'Comprehensive overview on simulating natural systems through code.', 'AI summary for The Nature of Code', 'http://example.com/the-nature-of-code.mp4', true, 'nature_of_code.mp4', NOW(), NOW()),
+('firebaseuid2', 'ef15c1a7-1b69-4d35-92fc-9c75cd8e1093', 'AI for Everyone', 'A beginner’s guide to understanding AI and its implications.', 'Insightful summary on the basics of AI and its impact.', 'AI summary for AI for Everyone', 'http://example.com/ai-for-everyone.mp4', false, 'ai_for_everyone.mp4', NOW(), NOW());
