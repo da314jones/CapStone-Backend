@@ -17,6 +17,8 @@ import fs from "fs";
 import dotenv from "dotenv";
 dotenv.config();
 
+
+
 // AWS SDK Configuration
 // Credentials will be automatically sourced from environment variables
 const s3Client = new S3Client({
@@ -49,6 +51,33 @@ const s3Client = new S3Client({
 //     throw error;
 //   }
 // };
+
+
+export const uploadBufferToS3 = async (buffer, metaDataObject) => {
+  const { user_id, title, ...rest }  = metaDataObject;
+  const fileName = `${title}.mp4`;
+  const s3Key = `users/${user_id}/${fileName}`
+  const params = {
+    Bucket: process.env.BUCKET_NAME,
+    Key: s3Key,
+    Body: buffer,
+    ContentType: 'video/mp4',
+    Metdata: rest,
+  };
+
+  try {
+    const command = new PutObjectCommand(params);
+    const response = await s3Client.send(command);
+
+    const fileUrl = `https://${params.Bucket}.s3.${process.env.AWS_REGION}.amazonaws.com/${s3Key}`;
+    console.log('Archive successfully uploaded to S3:')
+    return { key: s3Key, location: fileUrl }; // Return key and location
+  } catch (error) {
+    console.error("Error uploading buffer to S3:", error);
+    throw error;
+  }
+};
+
 
 const uploadFile = async (req, res) => {
   const { file } = req;

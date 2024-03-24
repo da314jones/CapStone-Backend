@@ -12,8 +12,8 @@ videos.post("/start-recording", videoController.startVideoRecording);
 
 videos.post("/stop-recording", videoController.stopVideoRecording);
 
-// videos.post("/upload-recording", videoController.uploadVideo);
+// In your videoRoutes.js or wherever you define routes
+videos.get('/archive/:archiveId', videoController.getArchiveDetailsAndUploadToS3);
 
-// videos.get ('/list', videoController.listFiles)
 
 export default videos;

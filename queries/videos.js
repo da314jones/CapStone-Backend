@@ -18,19 +18,22 @@ const getVideoById = async (id) => {
   }
 };
 
+
+
 const createVideo = async (video, idOnly) => {
   console.log("Attempting to create video with data:", video);
 
-  const { user_id, title, summary, signed_url, isPrivate, duration, archive_id } = video;
+  const { user_id, category, title, summary, signed_url, is_private, s3_key, archive_id, duration } = video;
   try {
     console.log("Received video metadata:", video)
-    let query = "";
+
+    let query;
     if (idOnly) {
-    query = "INSERT INTO videos (user_id, title, summary, signed_url, is_private, duration, archive_id) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id";
+      query = "INSERT INTO videos (user_id, category, title, summary, signed_url, is_private, s3_key, archive_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id";
     } else {
-      query = "INSERT INTO videos (user_id, title, summary, signed_url, is_private, duration, archive_id) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *";
+      query = "INSERT INTO videos (user_id, category, title, summary, signed_url, is_private, s3_key, archive_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *";
     }
-    const createdVideo = await db.one(query, [user_id, title, summary, signed_url, isPrivate, duration, archive_id]);
+    const createdVideo = await db.one(query, [user_id, category, title, summary, signed_url, is_private, s3_key, archive_id]);
     console.log("Video created:", createdVideo);
     return createdVideo;
   } catch (error) {
@@ -39,19 +42,19 @@ const createVideo = async (video, idOnly) => {
   }
 };
 
+
 const updateVideo = async (id, video) => {
   try {
-    const { firebase_uid, title, summary, signed_url, duration, created_at } = video;
+    const { firebase_uid, category, title, summary, is_private } = video;
     const updatedVideo = await db.one(
-      "UPDATE videos SET firebase_uid=$1, title=$2, summary=$3, signed_url=$4, duration=$5, created_at=$6 WHERE id=$7 RETURNING *",
+      "UPDATE videos SET firebase_uid=$1, title=$2, summary=$3, signed_url=$4, is_private=$5, created_at=$6 WHERE id=$7 RETURNING *",
       [
         video.firebase_uid,
+        video.category,
         video.title,
         video.summary,
         video.signed_url,
         video.is_private,
-        video.duration,
-        video.created_at,
         id,
       ]
     );

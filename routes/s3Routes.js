@@ -4,16 +4,10 @@ import {
   uploadFile,
   downloadFile,
   deleteFile,
-  listFiles,
-  // generateUploadPresignedUrl,
-  // generateDownloadPresignedUrl,
-} from "../controller/s3Controller.js"; // Adjusted import
+  listFiles
+} from "../controller/s3Controller.js"; 
 import upload from "./uploadMiddleware.js";
 
-// s3.get("/download-url/:fileName", generateDownloadPresignedUrl);
-
-// Route to generate an upload presigned URL
-// s3.post("/generate-presigned-url", generateUploadPresignedUrl);
 
 // POST route for file upload
 s3.post("/upload", upload.single("file"), uploadFile);
