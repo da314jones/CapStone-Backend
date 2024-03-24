@@ -49,9 +49,9 @@ export const getArchiveDetailsAndUploadToS3 = async (
   res,
   metaDataObject
 ) => {
-  const { archiveId } = req.params;
+  const archiveId  = req.params;
 console.log(archiveId);
-  const { user_id } = req.query; // Or determine userId from session, etc.
+  const  user_id  = req.query; // Or determine userId from session, etc.
 
   opentok.getArchive(archiveId, async (error, archive) => {
     if (error) {
@@ -105,12 +105,13 @@ console.log(archiveId);
 
 const createVideoMetadata = async (req, res, next) => {
   const metaDataObject = req.body;
-  const { user_id, title, archiveId } = metaDataObject;
+  console.log(metaDataObject)
+  const { user_id, category, title, archiveId } = metaDataObject;
   console.log(metaDataObject);
   try {
     console.log('Meta:', metaDataObject, 'Archive:', archiveId)
     const newVideo = await createVideo(metaDataObject);
-    await getArchiveDetailsAndUploadToS3(archiveId, metaDataObject);
+    await getArchiveDetailsAndUploadToS3(archiveId, metaDataObject, );
     console.log("Recieved video metadata:", metaDataObject);
     return res.status(201).json(newVideo);
   } catch (error) {
