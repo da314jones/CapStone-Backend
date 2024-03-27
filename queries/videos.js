@@ -1,40 +1,47 @@
 import { db } from "../db/dbConfig.js";
 
+// sS3 ready
 const getAllVideos = async () => {
   try {
     const allVideos = await db.any("SELECT * FROM videos");
+    return allVideos;
   } catch (error) {
     console.error("Error fetching all videos:", error);
     throw error;
   }
 };
 
-const getVideoById = async (id) => {
+const getVideoByTitle = async (title) => {
   try {
-    const videoById = await db.one("SELECT * FROM videos WHERE id =$1", id);
+    const videoByTitle = await db.one(
+      "SELECT * FROM videos WHERE title =$1",
+      title
+    );
+    return videoByTitle;
   } catch (error) {
     console.error("Error fetching videos by id:", error);
     throw error;
   }
 };
 
+//final schema ready / local machine
+const createVideo = async (video) => {
+  const {
+    user_id,
+    title,
+    summary,
+    category,
+    video_url,
+    is_private,
+    s3_key,
+    source,
+  } = video;
 
-
-const createVideo = async (video, idOnly) => {
-  console.log("Attempting to create video with data:", video);
-
-  const { user_id, category, title, summary, signed_url, is_private, s3_key, archive_id, duration } = video;
   try {
-    console.log("Received video metadata:", video)
-
-    let query;
-    if (idOnly) {
-      query = "INSERT INTO videos (user_id, category, title, summary, signed_url, is_private, s3_key, archive_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id";
-    } else {
-      query = "INSERT INTO videos (user_id, category, title, summary, signed_url, is_private, s3_key, archive_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *";
-    }
-    const createdVideo = await db.one(query, [user_id, category, title, summary, signed_url, is_private, s3_key, archive_id]);
-    console.log("Video created:", createdVideo);
+    const createdVideo = await db.one(
+      `INSERT INTO videos (user_id, title, summary, category, video_url, is_private, s3_key, source) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
+      [user_id, title, summary, category, video_url, is_private, s3_key, source]
+    );
     return createdVideo;
   } catch (error) {
     console.error("Error creating video", error);
@@ -42,26 +49,80 @@ const createVideo = async (video, idOnly) => {
   }
 };
 
-
-const updateVideo = async (id, video) => {
+//for tokbox
+const createInitialVideoMetadata = async ({
+  user_id,
+  archive_id,
+  title = "Untitled",
+  summary = "No summary",
+  is_private = true,
+}) => {
   try {
-    const { firebase_uid, category, title, summary, is_private } = video;
+    const createdVideo = await db.one(
+      `INSERT INTO videos (user_id, archive_id, title, summary, is_private) VALUES ($1, $2, $3, $4, $5) RETURNING *`,
+      [user_id, archive_id, title, summary, is_private]
+    );
+    return createdVideo;
+  } catch (error) {
+    console.error("Error creating initial video metadata:", error);
+    throw error;
+  }
+};
+
+const updateVonageVideoMetadata = async (
+  archive_id,
+  { title, summary, is_private, video_url }
+) => {
+  try {
+    const updatedVideo = await db.oneOrNone(
+      `UPDATE videos SET title=$1, summary=$2, is_private=$3, video_url=$4 WHERE archive_id=$5 RETURNING *`,
+      [title, summary, is_private, video_url, archive_id]
+    );
+    return updatedVideo;
+  } catch (error) {
+    console.error("Error updating video metadata:", error);
+    throw error;
+  }
+};
+
+const saveRecordingDetails = async ({ archive_id, user_id, title, summary, is_private, video_url }) => {
+  try {
+    // Assuming you want to insert new video details
+    const newVideo = await db.one(
+      `INSERT INTO videos (user_id, archive_id, title, summary, is_private, video_url) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
+      [user_id, archive_id, title, summary, is_private, video_url]
+    );
+    return newVideo;
+  } catch (error) {
+    console.error("Error saving recording details:", error);
+    throw error;
+  }
+};
+
+
+
+// only for replacement no 'video editing' full replacement
+const updateVideo = async (id, video) => {
+  const { title, summary, category, video_url, is_private, s3_key, source } =
+    video;
+  try {
     const updatedVideo = await db.one(
-      "UPDATE videos SET firebase_uid=$1, title=$2, summary=$3, signed_url=$4, is_private=$5, created_at=$6 WHERE id=$7 RETURNING *",
+      `UPDATE videos SET title=$1, summary=$2, category=$3, video_url=$4, is_private=$5, s3_key=$6, source=$7 WHERE id=$8 RETURNING *`,
       [
-        video.firebase_uid,
-        video.category,
-        video.title,
-        video.summary,
-        video.signed_url,
-        video.is_private,
+        user_id,
+        title,
+        summary,
+        category,
+        video_url,
+        is_private,
+        s3_key,
+        source,
         id,
       ]
     );
     return updatedVideo;
   } catch (error) {
-    console.error("Error creating video:", error);
-    throw error;
+    return error;
   }
 };
 
@@ -78,4 +139,13 @@ const deleteVideo = async (id) => {
   }
 };
 
-export { getAllVideos, getVideoById, createVideo, updateVideo, deleteVideo };
+export {
+  getAllVideos,
+  getVideoByTitle,
+  createVideo,
+  createInitialVideoMetadata,
+  updateVonageVideoMetadata,
+  saveRecordingDetails,
+  updateVideo,
+  deleteVideo,
+};
