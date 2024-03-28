@@ -7,7 +7,7 @@ videos.post("/session", videoController.creatingSession);
 
 videos.get("/token/:sessionId", videoController.generatingToken);
 
-// videos.post("/video-metadata/", videoController.createVideoMetadata);
+// videos.post("/video-metadata/", videoController.updateForVonageVideoMetadataUpload);
 
 videos.post("/start-recording", videoController.startVideoRecording);
 

@@ -4,7 +4,7 @@ dotenv.config();
 import fetch from "node-fetch";
 import OpenTok from "opentok";
 import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
-import fs from "fs";
+import fs, { rmSync } from "fs";
 import path from "path";
 import { uploadBufferToS3 } from "./s3Controller.js";
 import {
@@ -16,6 +16,8 @@ import {
   saveRecordingDetails,
   updateVideo,
   deleteVideo,
+  saveRecordingDetailsTodDb,
+  updateForVonageVideoMetadataUpload,
 } from "../queries/videos.js";
 
 const opentok = new OpenTok(
@@ -107,7 +109,7 @@ const startVideoRecording = async (req, res) => {
 
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
 
-const checkArchiveAvailability = async (archive_id, retries = 10) => {
+const checkArchiveAvailability = async (archive_id, retries = 5) => {
   if (retries === 0) {
     throw new Error('Archive not available after maximum retries');
   }
@@ -118,7 +120,7 @@ const checkArchiveAvailability = async (archive_id, retries = 10) => {
       resolve(archive);
     });
   });
-
+console.log(archive)
   if (archive && archive.status === 'available' && archive.url) {
     return archive;
   } else {
@@ -128,9 +130,8 @@ const checkArchiveAvailability = async (archive_id, retries = 10) => {
 };
 
 const stopVideoRecording = async (req, res) => {
-  const { archiveId, user_id } = req.body;
+  const { archiveId } = req.body;
   console.log(req.body)
-  console.log("user_id:", user_id)
   if (!archiveId) {
     return res.status(400).json({ message: 'archiveId is required' });
   }
@@ -144,16 +145,19 @@ const stopVideoRecording = async (req, res) => {
       console.log('[stopVideoRecording] Recording stopped successfully:', archiveId);
       try{
         const archive = await checkArchiveAvailability(archiveId);
-        const metaDataObject = {
-          archive_id: archiveId,
-          title: req.body.title, 
-          summary: req.body.summary,
-          is_private: req.body.is_private,
-          video_url: archive.url, 
-        }; 
-        const savedDetails = await saveRecordingDetails(archiveId, user_id);
+        console.log(archive)
+        let savedDetails = null;
+        if (archive && archive.status === 'available') {
+          const metaDataObject = {
+            archive_id: archiveId,
+            video_url: archive.url, 
+          }; 
+          savedDetails = await saveRecordingDetailsTodDb(metaDataObject);
+        }
+                  console.log("Before the saveDetails:", archive)
+        console.log("saveRecordingDetails waiting for results:", archiveId);
       res.json({
-        message: 'Recording stopped and metadata updated',
+        message: 'Recording stopped and metadata updated',savedDetails 
       });
     } catch (error) {
       throw new Error(`Error processing archive: ${error.message}`)
@@ -171,6 +175,7 @@ const stopVideoRecording = async (req, res) => {
 
 const downloadArchive = async (archiveUrl, filename) => {
   const response = await fetch(archiveUrl);
+  const addMetaObject = await updateForVonageVideoMetadataUpload();
   if (!response.ok) {
     throw new Error('Failed to download archive file');
   }

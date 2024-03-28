@@ -69,7 +69,18 @@ const createInitialVideoMetadata = async ({
   }
 };
 
-const updateVonageVideoMetadata = async (
+const saveRecordingDetailsTodDb = async ({ archive_id, video_url }) => {
+  try {
+    const updateVideo = await db.one(`UPDATE videos SET video_url = $2 WHERE archive_id = $1 RETURNING *`,
+    [archive_id, video_url,]);
+    return updateVideo;
+  } catch (error) {
+    console.error("Error saving recording details:", error);
+    throw error;
+  }
+};
+
+const updateForVonageVideoMetadataUpload = async (
   archive_id,
   { title, summary, is_private, video_url }
 ) => {
@@ -85,19 +96,6 @@ const updateVonageVideoMetadata = async (
   }
 };
 
-const saveRecordingDetails = async ({ archive_id, user_id, title, summary, is_private, video_url }) => {
-  try {
-    // Assuming you want to insert new video details
-    const newVideo = await db.one(
-      `INSERT INTO videos (user_id, archive_id, title, summary, is_private, video_url) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
-      [user_id, archive_id, title, summary, is_private, video_url]
-    );
-    return newVideo;
-  } catch (error) {
-    console.error("Error saving recording details:", error);
-    throw error;
-  }
-};
 
 
 
@@ -144,8 +142,8 @@ export {
   getVideoByTitle,
   createVideo,
   createInitialVideoMetadata,
-  updateVonageVideoMetadata,
-  saveRecordingDetails,
+  saveRecordingDetailsTodDb,
+  updateForVonageVideoMetadataUpload,
   updateVideo,
   deleteVideo,
 };
