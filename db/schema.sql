@@ -32,6 +32,7 @@ CREATE TABLE videos (
 
 
 
+
 -- Recreate the closed_captions table
 -- CREATE TABLE closed_captions (
 --     id SERIAL PRIMARY KEY,
