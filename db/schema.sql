@@ -22,9 +22,10 @@ CREATE TABLE videos (
     title VARCHAR(255),
     summary TEXT,
     ai_summary TEXT,
-    video_url TEXT, -- URL from S3
-    is_private BOOLEAN DEFAULT FALSE, -- Privacy setting for the video
-    s3_key TEXT, -- To identify the file in S3 bucket
+    signed_url TEXT, 
+    is_private BOOLEAN DEFAULT FALSE, 
+    s3_key TEXT,
+    thumbnail VARCHAR (255),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
