@@ -6,8 +6,8 @@ import ffmpeg from 'fluent-ffmpeg';
 import fetch from "node-fetch";
 import OpenTok from "opentok";
 import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
-import fs from "fs";
-import path from "path";import { getVideoByArchiveId, updateDatabaseWithS3Url, updateDatabaseWithVideoAndThumbnail } from "../queries/videos.js";
+import path from "path";
+import { getVideoByArchiveId, updateDatabaseWithVideoThumbnailUrl } from "../queries/videos.js";
 
 
 const opentok = new OpenTok(
@@ -23,6 +23,46 @@ const s3Client = new S3Client({
     secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
   },
 });
+
+// Reformat the title to create a valid thumbnail key 
+const uploadImageToS3 = async (formData, archive_id) => {
+  videoDetails = await getVideoByArchiveId(archive_id);
+ console.log(videoDetails); // This should log the object with user_id
+ console.log(archive_id)
+ if (!videoDetails) {
+   throw new Error("Video not found with archiveId.");
+ }
+
+  userId = videoDetails.user_id; 
+  sanitizedTitle = formData.title.replace(/[^a-zA-Z0-9-_]+/g, '-');
+ const thumbnailKey = `user/${userId}/${sanitizedTitle}.png`;
+   const localImagePath = `./utility/${archive_id}.png`;
+
+ try {
+   await fs.promises.access(localImagePath, fs.constants.F_OK);
+
+   const fileImageStream = fs.createReadStream(localImagePath);
+   const uploadImageParams = {
+     Bucket: process.env.BUCKET_NAME,
+     Key: thumbnailKey,
+     Body: fileImageStream,
+     Metadata: {
+       title: formData.title,
+       summary: formData.summary,
+     },
+   };
+
+   const uploadImage = await s3Client.send(new PutObjectCommand(uploadImageParams));
+   console.log('Upload Image:', uploadImage);
+
+   const thumbailUrl = `https://${process.env.BUCKET_NAME}.s3.amazonaws.com/${thumbnailKey}`;
+   await updateDatabaseWithThumbailUrl(archive_id, formData, thumbnailKey)
+   return thumbailUrl;
+ } catch (err) {
+   console.error(`${localImagePath} does not exist or other error:`, err);
+   throw err; 
+ }
+};
 
   // Reformat the title to create a valid S3 key 
   const uploadVideoToS3 = async (formData, archiveId) => {
@@ -41,19 +81,19 @@ const s3Client = new S3Client({
     try {
       await fs.promises.access(localVideoPath, fs.constants.F_OK);
   
-      const fileStream = fs.createReadStream(localVideoPath);
-      const uploadParams = {
+      const fileVideoStream = fs.createReadStream(localVideoPath);
+      const uploadVideoParams = {
         Bucket: process.env.BUCKET_NAME,
         Key: s3Key,
-        Body: fileStream,
+        Body: fileVideoStream,
         Metadata: {
           title: formData.title,
           summary: formData.summary,
         },
       };
   
-      const uploadResult = await s3Client.send(new PutObjectCommand(uploadParams));
-      console.log('Upload Result:', uploadResult);
+      const uploadVideo = await s3Client.send(new PutObjectCommand(uploadVideoParams));
+      console.log('Upload Video:', uploadVideo);
   
       const s3Url = `https://${process.env.BUCKET_NAME}.s3.amazonaws.com/${s3Key}`;
       await updateDatabaseWithS3Url(archiveId, formData, s3Key)
@@ -70,9 +110,10 @@ const processVideoData = async (req, res) => {
 
   try {
     const s3Url = await uploadVideoToS3(formData, archiveId);
+    const thumbnailUrl = await uploadImageToS3(formData, archiveId);
     res.json({
-      message: "Video successfully uploaded to s3 and the database updated",
-      s3Url: s3Url,
+      message: "Video and thumbnail successfully uploaded to s3 and the database updated",
+      s3Url: s3Url, thumbnailUrl: thumbnailUrl
     });
   } catch (error) {
     console.error('Error processing video data:', error);
@@ -183,7 +224,7 @@ const processVideoData = async (req, res) => {
 // // };
 
 
-// export default {
+export default {
 //     // downloadAndUploadArchive,
-//     processVideoData
-// }
+    processVideoData
+}

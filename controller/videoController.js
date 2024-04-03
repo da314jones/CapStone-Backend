@@ -3,10 +3,12 @@ import dotenv from "dotenv";
 dotenv.config();
 import fetch from "node-fetch";
 import OpenTok from "opentok";
+// import ffmpeg from 'fluent-ffmpeg';
 import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
 import fs, { rmSync } from "fs";
 import path from "path";
 import { uploadBufferToS3 } from "./s3Controller.js";
+import generateThumbnail from "../utilityServive/imageService.js"
 import {
   getAllVideos,
   getVideoByTitle,
@@ -143,47 +145,75 @@ const getArchiveUrlFromVonage = async (videoUrl, outputPath) => {
 
 const stopVideoRecording = async (req, res) => {
   const { archiveId } = req.body;
-  console.log(req.body)
-  if (!archiveId) {
-    return res.status(400).json({ message: 'archiveId is required' });
-  }
-
   try {
-    opentok.stopArchive(archiveId, async (error) => {
-      if (error) {
-        throw new Error(error.message || 'Internal Server Error');
-      }
-
-      console.log('[stopVideoRecording] Recording stopped successfully:', archiveId);
-      try{
-        const archive = await checkArchiveAvailability(archiveId);
-        let savedDetails = null;
-        if (archive && archive.status === 'available') {
-          const metaDataObject = {
-            archive_id: archiveId,
-            video_url: archive.url, 
-          }; 
-          savedDetails = await saveRecordingDetailsTodDb(metaDataObject);
-        };
-        const outputPath = `./utility/${archiveId}.mp4`;
-        await getArchiveUrlFromVonage(archive.url, outputPath);
-        console.log(`Video downloaded to local:, ${outputPath}`)
-        console.log("saveRecordingDetails waiting for results:", archiveId);
-      res.json({
-        message: 'Recording stopped and metadata updated',savedDetails, downloadPath: outputPath 
-      });
-    } catch (error) {
-      throw new Error(`Error processing archive: ${error.message}`)
-    }
+    const archive = await stopAndFetchArchiveDetails(archiveId);
+    const videoPath = await downloadVideo(archive.url, archiveId);
+    const thumbnailPath = await generateThumbnail(videoPath, archiveId);
+    const [videoS3Url, thumbnailS3Url] = await Promise.all([
+      uploadFileToS3(videoPath, `videos/${archiveId}.mp4`),
+      uploadFileToS3(thumbnailPath, `thumbnails/${archiveId}.png`)
+    ]);
+    await saveRecordingDetailsToDb({
+      archiveId,
+      videoUrl: videoS3Url,
+      thumbnailUrl: thumbnailS3Url
+    });
+    // Clean up local files
+    fs.unlinkSync(videoPath);
+    fs.unlinkSync(thumbnailPath);
+    res.json({
+      message: "Recording processed successfully",
+      videoUrl: videoS3Url,
+      thumbnailUrl: thumbnailS3Url
     });
   } catch (error) {
-    console.error('[stopVideoRecording] Error:', error);
-    res.status(500).json({
-      message: 'Failed to stop recording or fetch archive details',
-      error: error.message
-    });
+    console.error("Failed to process recording:", error);
+    res.status(500).json({ message: "Failed to process recording", error: error.toString() });
   }
 };
+
+// Assume `stopAndFetchArchiveDetails`, `downloadVideo`, `generateThumbnail`, `uploadFileToS3`, and `saveRecordingDetailsToDb` are defined
+
+// Example of how you might define one of the utility functions
+async function downloadVideo(url, archiveId) {
+  const outputPath = path.join(__dirname, 'downloads', `${archiveId}.mp4`);
+  const response = await fetch(url);
+  if (!response.ok) throw new Error('Failed to download video');
+  await new Promise((resolve, reject) => {
+    const fileStream = fs.createWriteStream(outputPath);
+    response.body.pipe(fileStream);
+    response.body.on('error', reject);
+    fileStream.on('finish', resolve);
+  });
+  return outputPath;
+}
+
+async function generateThumbnail(videoPath, thumbnailPath) {
+  return new Promise((resolve, reject) => {
+      ffmpeg(videoPath)
+          .screenshots({
+              count: 1,
+              folder: path.dirname(thumbnailPath),
+              filename: path.basename(thumbnailPath),
+              size: '320x240'
+          })
+          .on('end', resolve)
+          .on('error', reject);
+  });
+}
+
+async function uploadFileToS3(filePath, s3Key) {
+  const fileStream = fs.createReadStream(filePath);
+  const uploadParams = {
+      Bucket: process.env.S3_BUCKET_NAME,
+      Key: s3Key,
+      Body: fileStream,
+  };
+  await s3Client.send(new PutObjectCommand(uploadParams));
+  return `https://${process.env.S3_BUCKET_NAME}.s3.amazonaws.com/${s3Key}`;
+}
+};
+}
 
 
 const downloadArchive = async (archiveUrl, filename) => {
@@ -201,13 +231,58 @@ const downloadArchive = async (archiveUrl, filename) => {
   });
 };
 
+const validateInputs = (archive_id, formData) => {
+  if (!archive_id) throw new Error("Archive ID is required.");
+  if (!formData || typeof formData !== 'object') throw new Error("Form data is invalid.");
+};
+
+ const processVideoUpload = async (req, res) => {
+  const { archive_id } = req.params;
+  const formData = req.body;
+  
+  // validate data
+  validateInputs(archive_id, formData);
+
+  try {
+    //  keys and paths
+    const videoKey = `videos/${archive_id}.mp4`;
+    const videoPath = `./utility/${archive_id}.mp4`;
+    const thumbnailKey = `thumbnails/${archive_id}.png`;
+    const thumbnailPath = `./utility/${archive_id}-thumbnail.png`;
+
+    //  uploads
+    const videoUrl = await uploadToS3(videoPath, videoKey, {title: formData.title});
+    const thumbnailUrl = await uploadToS3(thumbnailPath, thumbnailKey, {title: formData.title});
+
+    await updateDatabaseWithVideoThumbnailUrl(archive_id, videoS3Key, thumbnailS3Key)
+    // Update database 
+    await updateVideoRecord(archive_id, {signed_url: videoUrl, thumbnail: thumbnailUrl});
+
+    // delete local files
+fs.unlinkSync(outputPath);
+fs.unlinkSync(thumbnailPath);
+
+// Response to client
+res.json({
+  message: 'Video processed successfully',
+  videoUrl: `https://${process.env.BUCKET_NAME}.s3.amazonaws.com/${videoS3Key}`,
+  thumbnailUrl: `https://${process.env.BUCKET_NAME}.s3.amazonaws.com/${thumbnailS3Key}`,
+});
+
+  } catch (error) {
+    console.error('Error processing video upload:', error);
+    res.status(500).send('Failed to process video upload.');
+  }
+};
+
+
 
 export const updateVideoDetails = async (req, res) => {
   const { archive_id } = req.params;
-  const { title, summary, is_private, video_url } = req.body;
+  const { title, summary, is_private, signed_url } = req.body;
   
   try {
-    const updatedVideo = await updateVonageVideoMetadata(archive_id, { title, summary, is_private, video_url });
+    const updatedVideo = await updateVonageVideoMetadata(archive_id, { title, summary, is_private, signed_url });
     res.json(updatedVideo);
   } catch (error) {
     res.status(500).json({ message: "Failed to update video metadata", error });
@@ -238,6 +313,7 @@ export default {
   startVideoRecording,
   stopVideoRecording,
   downloadArchive,
+  processVideoUpload,
   updateVideoDetails,
   deleteVideoMetadata,
 };

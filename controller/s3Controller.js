@@ -28,9 +28,26 @@ const s3Client = new S3Client({
   },
 });
 
+const uploadToS3 = async (filePath, key, metadata) => {
+  const fileStream = fs.createReadStream(filePath);
+  const uploadParams = {
+    Bucket: process.env.BUCKET_NAME,
+    Key: key,
+    Body: fileStream,
+    Metadata: metadata,
+  };
 
+  try {
+    await s3Client.send(new PutObjectCommand(uploadParams));
+    console.log(`Upload successful: ${key}`);
+    return `https://${process.env.BUCKET_NAME}.s3.amazonaws.com/${key}`;
+  } catch (error) {
+    console.error(`Upload failed for ${key}:`, error);
+    throw error;
+  }
+};
 
-export const uploadBufferToS3 = async (buffer, metaDataObject) => {
+ const uploadBufferToS3 = async (buffer, metaDataObject) => {
   const { user_id, title, ...rest }  = metaDataObject;
   const fileName = `${title}.mp4`;
   const s3Key = `users/${user_id}/${fileName}`
@@ -65,7 +82,7 @@ const uploadFile = async (req, res) => {
   const user_id = req.body.user_id;
   const title = req.body.title || "Untitled";
   const summary = req.body.summary || "";
-  const isPrivate = req.body.isPrivate === "true";
+  const is_private = req.body.is_private === "true";
   const duration = parseInt(req.body.duration) || 0;
 
   const fileStream = fs.createReadStream(file.path);
@@ -90,8 +107,8 @@ const uploadFile = async (req, res) => {
       user_id,
       title: req.body.title || "Untitled",
       summary: req.body.summary || "",
-      video_url: fileUrl,
-      isPrivate: req.body.isPrivate || false,
+      signed_url: fileUrl,
+      is_private: req.body.is_private || false,
       duration: req.body.duration || 0,
     });
     const newVideo = await createVideo(video);
@@ -194,6 +211,8 @@ const listFiles = async (req, res) => {
 
 
 export {
+  uploadToS3,
+  uploadBufferToS3,
   uploadFile,
   downloadFile,
   deleteFile,

@@ -25,7 +25,8 @@ CREATE TABLE videos (
     signed_url TEXT, 
     is_private BOOLEAN DEFAULT FALSE, 
     s3_key TEXT,
-    thumbnail VARCHAR (255),
+    thumbnail_key VARCHAR (255),
+    source VARCHAR DEFAULT 'Vonage',
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
