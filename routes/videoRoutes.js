@@ -13,7 +13,7 @@ videos.post("/stop-recording", videoController.stopVideoRecording);
 
 videos.post('/uploadVideo/:archiveId', processVideoData)
 
-videos.get('/index', videoController.allVideos)
+videos.get('/index', videoController.listFiles)
 
 export default videos;
 

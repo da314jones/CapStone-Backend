@@ -5,31 +5,28 @@ import fetch from "node-fetch";
 import OpenTok from "opentok";
 import fs from "fs";
 import path from "path";
-import { S3Client, PutObjectCommand, ListObjectsV2Command, GetObjectCommand } from "@aws-sdk/client-s3";
-import { getSignedUrl } from "aws-sdk/s3-request-presigner";
-import { generateThumbnail } from "../utilityService/imageService.js"
+import {
+  S3Client,
+  PutObjectCommand,
+  ListObjectsV2Command,
+  GetObjectCommand,
+} from "@aws-sdk/client-s3";
+import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
+import { generateThumbnail } from "../utilityService/imageService.js";
 import {
   createVideoEntry,
   getAllVideos,
   getVideoByTitle,
-  getaAllvideos,
-  createInitialVideoMetadata,
-  updateForVonageVideoMetadataUpload,
-  getVideoMetadata,
-  updateVideoRecord,
-  deleteVideo,
-  getVideoByArchiveId,
 } from "../queries/videos.js";
 
-
-
-// Confirm that these paths are logged and correctly defined
 const videoPath = process.env.VIDEO_PATH;
 const thumbnailPath = process.env.THUMBNAIL_PATH;
 
 if (!videoPath || !thumbnailPath) {
-  console.error("Base paths are not defined. Please check your environment variables.");
-  process.exit(1); // Stop execution if paths are not defined
+  console.error(
+    "Base paths are not defined. Please check your environment variables."
+  );
+  process.exit(1); // Stops execution if paths are not defined
 }
 
 const opentok = new OpenTok(
@@ -44,32 +41,6 @@ const s3Client = new S3Client({
     secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
   },
 });
-
-
-// const videoByTitle = async (req, res) => {
-//   try {
-//     const video = await getVideoByTitle(req.params.id);
-//     if (video) {
-//       const videoUrl = await getSignedUrl(s3Client, new GetObjectCommand({
-//         Bucket: process.env.BUCKET_NAME,
-//         Key: video.s3_key
-//       }), { expiresIn: 3600 });
-
-//       const thumbnailUrl = await getSignedUrl(s3Client, new GetObjectCommand({
-//         Bucket: process.env.BUCKET_NAME,
-//         Key: video.thumbnail_key
-//       }), { expiresIn: 3600 });
-
-//       res.json({ ...video, videoUrl, thumbnailUrl });
-//     } else {
-//       res.status(404).json({ message: "Video not found" });
-//     }
-//   } catch (error) {
-//     console.error("Error fetching video by title:", error);
-//     res.status(500).json({ message: "Error fetching video", error: error.toString() });
-//   }
-// };
-
 
 export const creatingSession = async (req, res) => {
   opentok.createSession({ mediaMode: "routed" }, function (error, session) {
@@ -103,83 +74,101 @@ const startVideoRecording = async (req, res) => {
   const { sessionId, user_id } = req.body;
 
   if (!sessionId || !user_id) {
-      return res.status(400).json({ error: "Both sessionId and user_id are required." });
+    return res
+      .status(400)
+      .json({ error: "Both sessionId and user_id are required." });
   }
 
   try {
-    opentok.startArchive(sessionId, { name: "Session Recording" }, async (error, archive) => {
+    opentok.startArchive(
+      sessionId,
+      { name: "Session Recording" },
+      async (error, archive) => {
         if (error) {
-            console.error("Failed to start recording:", error);
-            return res.status(500).json({ message: "Failed to start recording", error: error.message });
-        }
-
-        // Create a video entry with the received archiveId and userId
-        try {
-            const createdVideo = await createVideoEntry(user_id, archive.id);
-            res.status(201).json({
-                message: "Recording started and video entry created successfully.",
-                archiveId: archive.id,
-                videoDetails: createdVideo
+          console.error("Failed to start recording:", error);
+          return res
+            .status(500)
+            .json({
+              message: "Failed to start recording",
+              error: error.message,
             });
-        } catch (dbError) {
-            console.error("Error creating video entry:", dbError);
-            res.status(500).json({ message: "Failed to create video entry", error: dbError.message });
         }
-    });
+        try {
+          const createdVideo = await createVideoEntry(user_id, archive.id);
+          res.status(201).json({
+            message: "Recording started and video entry created successfully.",
+            archiveId: archive.id,
+            videoDetails: createdVideo,
+          });
+        } catch (dbError) {
+          console.error("Error creating video entry:", dbError);
+          res
+            .status(500)
+            .json({
+              message: "Failed to create video entry",
+              error: dbError.message,
+            });
+        }
+      }
+    );
   } catch (generalError) {
     console.error("Error in starting recording process:", generalError);
-    res.status(500).json({ message: "An error occurred in the recording process", error: generalError.message });
+    res
+      .status(500)
+      .json({
+        message: "An error occurred in the recording process",
+        error: generalError.message,
+      });
   }
 };
 
-
-
 const downloadArchive = async (archiveUrl, archiveId) => {
   const filename = `${archiveId}.mp4`;
-  const filePath = '/Users/djones/Desktop/working-repository/10.2/MODULE_6_CAPSTONE/Tidbits/CapStone-Backend/videos/' + filename;
-  
-  // Check if the directory exists, create if not
-  const directory = '/Users/djones/Desktop/working-repository/10.2/MODULE_6_CAPSTONE/Tidbits/CapStone-Backend/videos';
-  
+  const filePath =
+    "/Users/djones/Desktop/working-repository/10.2/MODULE_6_CAPSTONE/Tidbits/CapStone-Backend/videos/" +
+    filename;
+
+  const directory =
+    "/Users/djones/Desktop/working-repository/10.2/MODULE_6_CAPSTONE/Tidbits/CapStone-Backend/videos";
+
   try {
     await fs.promises.mkdir(directory, { recursive: true });
   } catch (err) {
-    if (err.code !== 'EEXIST') {
-      throw err; // throws error if directory creation failed for any reason other than already existing
+    if (err.code !== "EEXIST") {
+      throw err; 
     }
   }
 
   try {
     const response = await fetch(archiveUrl);
     if (!response.ok) {
-      throw new Error('Failed to download archive file');
+      throw new Error("Failed to download archive file");
     }
-    
+
     const dest = fs.createWriteStream(filePath);
     response.body.pipe(dest);
 
     return new Promise((resolve, reject) => {
-      dest.on('finish', () => {
+      dest.on("finish", () => {
         console.log(`Download complete: ${filePath}`);
         resolve(filePath);
       });
-      dest.on('error', (err) => {
+      dest.on("error", (err) => {
         console.error(`Error writing file to: ${filePath}`, err);
         reject(err);
       });
     });
   } catch (error) {
-    console.error('Error downloading archive:', error);
+    console.error("Error downloading archive:", error);
     throw error;
   }
 };
 
-
-const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
+const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const checkArchiveAvailability = async (archiveId, retries = 10) => {
   if (retries === 0) {
-    throw new Error('Archive not available after maximum retries');
+    throw new Error("Archive not available after maximum retries");
   }
 
   const archive = await new Promise((resolve, reject) => {
@@ -188,8 +177,8 @@ const checkArchiveAvailability = async (archiveId, retries = 10) => {
       resolve(archive);
     });
   });
-console.log(archive)
-  if (archive && archive.status === 'available' && archive.url) {
+  console.log(archive);
+  if (archive && archive.status === "available" && archive.url) {
     return archive;
   } else {
     await delay(1000);
@@ -197,16 +186,14 @@ console.log(archive)
   }
 };
 
-
 const getArchiveUrlAndSaveVideo = async (archiveId) => {
   const response = await checkArchiveAvailability(archiveId);
   if (!response.status) {
     throw new Error(`Failed to fetch video: ${response.statusText}`);
-  }  
+  }
   const videoFile = await downloadArchive(response.url, archiveId);
-  return [response, videoFile]
+  return [response, videoFile];
 };
-
 
 const stopVideoRecording = async (req, res) => {
   const { archiveId, user_id } = req.body;
@@ -214,7 +201,7 @@ const stopVideoRecording = async (req, res) => {
     const archive = await new Promise((resolve, reject) => {
       opentok.stopArchive(archiveId, (error, archive) => {
         if (error) {
-          reject(new Error(error.message || 'Internal Server Error'));
+          reject(new Error(error.message || "Internal Server Error"));
         } else {
           resolve(archive);
         }
@@ -223,59 +210,120 @@ const stopVideoRecording = async (req, res) => {
     const [response, videoPath] = await getArchiveUrlAndSaveVideo(archiveId);
     const thumbnailPath = await generateThumbnail(videoPath, archiveId);
     res.json({
-      message: 'Recording and thumbnail processed successfully',
-      details: { videoPath, thumbnailPath, archiveId }
+      message: "Recording and thumbnail processed successfully",
+      details: { videoPath, thumbnailPath, archiveId },
     });
   } catch (error) {
-    console.error('Failed to stop recording:', error);
-    res.status(500).json({ message: 'Failed to stop recording', error: error.toString() });
+    console.error("Failed to stop recording:", error);
+    res
+      .status(500)
+      .json({ message: "Failed to stop recording", error: error.toString() });
   }
 };
 
-
-async function generatePresignedUrl() {
+const generatePresignedUrl = async () => {
   try {
     const command = new GetObjectCommand({
       Bucket: process.env.BUCKET_NAME,
-      Key: process.env.AWS_SECRET_ACCESS_KEY
+      Key: process.env.AWS_SECRET_ACCESS_KEY,
     });
-      const url = await getSignedUrl(s3Client, command, { expiresIn: 3600 });
-      console.log("Presigned URL:", url);
-      return url;
+    const url = await getSignedUrl(s3Client, command, { expiresIn: 3600 });
+    console.log("Presigned URL:", url);
+    return url;
   } catch (error) {
-      console.error("Error generating presigned URL:", error);
+    console.error("Error generating presigned URL:", error);
   }
-}
+};
 
 generatePresignedUrl();
+
+const listFiles = async (req, res) => {
+  const params = {
+    Bucket: process.env.BUCKET_NAME,
+  };
+
+  try {
+    const command = new ListObjectsV2Command(params);
+    const s3Data = await s3Client.send(command);
+    if (!s3Data.Contents) {
+      console.error("No contents found in bucket");
+      return res.status(404).json({ message: "No videos found in S3" });
+    }
+
+    const videosFromDb = await getAllVideos();
+    if (!videosFromDb.length) {
+      console.error("No video metadata found in database");
+      return res.status(404).json({ message: "No video metadata found" });
+    }
+
+    const videoWithSignedUrls = s3Data.Contents.map((s3Video) => {
+      const videoMetadata = videosFromDb.find((v) => v.s3_key === s3Video.Key);
+      if (!videoMetadata) {
+        console.log(`No metadata found for key: ${s3Video.Key}`);
+        return null;
+      }
+
+      const signedUrl = `https://${params.BUCKET_NAME}.s3.${process.env.AWS_REGION}.amazonaws.com/${s3Video.Key}`;
+      return {
+        ...s3Video,
+        ...videoMetadata,
+        signedUrl: signedUrl,
+      };
+    }).filter((video) => video !== null);
+
+    res.json({
+      message: "Successfully retrieved bucket list:",
+      videoWithSignedUrls,
+    });
+  } catch (error) {
+    console.error("Error listing files:", error);
+    res
+      .status(500)
+      .json({
+        message: "Error listing files from S3",
+        error: error.toString(),
+      });
+  }
+};
 
 export const allVideos = async (req, res) => {
   try {
     const videos = await getAllVideos();
-    const videoData = await Promise.all(videos.map(async (video) => {
-      const videoSignedUrl = await getSignedUrl(s3Client, new GetObjectCommand({
-        Bucket: process.env.BUCKET_NAME,
-        Key: video.s3_key
-      }), { expiresIn: 3600 });
+    const videoData = await Promise.all(
+      videos.map(async (video) => {
+        const videoSignedUrl = await getSignedUrl(
+          s3Client,
+          new GetObjectCommand({
+            Bucket: process.env.BUCKET_NAME,
+            Key: video.s3_key,
+          }),
+          { expiresIn: 3600 }
+        );
 
-      const thumbnailSignedUrl = await getSignedUrl(s3Client, new GetObjectCommand({
-        Bucket: process.env.BUCKET_NAME,
-        Key: video.thumbnail_key
-      }), { expiresIn: 3600 });
+        const thumbnailSignedUrl = await getSignedUrl(
+          s3Client,
+          new GetObjectCommand({
+            Bucket: process.env.BUCKET_NAME,
+            Key: video.thumbnail_key,
+          }),
+          { expiresIn: 3600 }
+        );
 
-      return {
-        ...video,
-        videoUrl: videoSignedUrl,
-        thumbnailUrl: thumbnailSignedUrl
-      };
-    }));
+        return {
+          ...video,
+          videoUrl: videoSignedUrl,
+          thumbnailUrl: thumbnailSignedUrl,
+        };
+      })
+    );
     res.json({ videoWithSignedUrls: videoData });
   } catch (error) {
     console.error("Error fetching videos:", error);
-    res.status(500).json({ message: "Error fetching videos", error: error.toString() });
+    res
+      .status(500)
+      .json({ message: "Error fetching videos", error: error.toString() });
   }
 };
-
 
 const videoByTitle = async (req, res) => {
   try {
@@ -291,40 +339,10 @@ const videoByTitle = async (req, res) => {
   }
 };
 
-// export const videoWithMetadataObject = async (req, res) => {
-//   try {
-//     const videos = await getAllVideos();
-//     const videoData = await Promise.all(videos.map(async (video) => {
-//       const videoUrl = await getSignedUrl(s3Client, new GetObjectCommand({
-//         Bucket: process.env.BUCKET_NAME,
-//         Key: videothumbnail_key
-//       }), { expiresIn: 3600 });
-//       return {
-//         title: video.title,
-//         videoUrl,
-//         duration: video.duration,
-//         views: video.views
-//       };
-//     }));
-//     res.json({ videoWithSignedUrls: videoData });
-//   } catch (error) {
-//     console.error('Failed to list videos:', error);
-//     res.status(500).json({ message: 'Failed to retrieve videos', error: error.toString() });
-//   }
-// };
-
-
-
-
-
-  
-  
-
-
 // export const updateVideoDetails = async (req, res) => {
 //   const { archiveId } = req.params;
 //   const { title, summary, is_private, signed_url } = req.body;
-  
+
 //   try {
 //     const updatedVideo = await updateVonageVideoMetadata(archiveId, { title, summary, is_private, signed_url });
 //     res.json(updatedVideo);
@@ -355,8 +373,8 @@ export default {
   generatingToken,
   startVideoRecording,
   stopVideoRecording,
-  videoWithMetadataObject,
   downloadArchive,
-  updateVideoDetails,
-  deleteVideoMetadata,
+  listFiles,
+  // updateVideoDetails,
+  // deleteVideoMetadata,
 };

@@ -128,9 +128,7 @@ const updateDatabaseWithVideoAndThumbnail = async (archiveId, videoS3Key, thumbn
   }
 };
 
-
-
-// sS3 ready
+//confirmed
 const getAllVideos = async () => {
   try {
     const allVideos = await db.any("SELECT * FROM videos");
@@ -142,6 +140,18 @@ const getAllVideos = async () => {
 };
 
 
+const getVideoByTitle = async (title) => {
+  try {
+    const videoByTitle = await db.one(
+      "SELECT * FROM videos WHERE title=$1",
+      title
+    );
+    return videoByTitle;
+  } catch (error) {
+    console.error("Error fetching videos by id:", error);
+    throw error;
+  }
+};
 
 const createInitialVideoMetadata = async ({
   user_id,
@@ -172,18 +182,6 @@ const createInitialVideoMetadata = async ({
 };
 
 
-const getVideoByTitle = async (title) => {
-  try {
-    const videoByTitle = await db.one(
-      "SELECT * FROM videos WHERE title=$1",
-      title
-    );
-    return videoByTitle;
-  } catch (error) {
-    console.error("Error fetching videos by id:", error);
-    throw error;
-  }
-};
 
 
 
@@ -237,86 +235,86 @@ const createVideo = async (video) => {
 
 
 
-async function getVideoMetadata(archiveId) {
-  try {
-      const videoDetails = await getVideoByArchiveId(archiveId);
-      if (!videoDetails) {
-          throw new Error("No video found for the given archive ID");
-      }
+// async function getVideoMetadata(archiveId) {
+//   try {
+//       const videoDetails = await getVideoByArchiveId(archiveId);
+//       if (!videoDetails) {
+//           throw new Error("No video found for the given archive ID");
+//       }
       
-      return {
-          userId: videoDetails.user_id,
-          archiveId: videoDetails.archiveId,
-          category: videoDetails.category,
-          title: videoDetails.title,
-          summary: videoDetails.summary,
-          aiSummary: videoDetails.ai_summary,
-          isPrivate: videoDetails.is_private.toString(),  
-          source: videoDetails.source || 'Vonage', 
-          createdAt: videoDetails.created_at ? videoDetails.created_at.toISOString() : new Date().toISOString(),
-          updatedAt: videoDetails.updated_at ? videoDetails.updated_at.toISOString() : new Date().toISOString()
-      };
-  } catch (error) {
-      console.error("Error fetching video metadata:", error);
-      throw error;
-  }
-}
+//       return {
+//           userId: videoDetails.user_id,
+//           archiveId: videoDetails.archiveId,
+//           category: videoDetails.category,
+//           title: videoDetails.title,
+//           summary: videoDetails.summary,
+//           aiSummary: videoDetails.ai_summary,
+//           isPrivate: videoDetails.is_private.toString(),  
+//           source: videoDetails.source || 'Vonage', 
+//           createdAt: videoDetails.created_at ? videoDetails.created_at.toISOString() : new Date().toISOString(),
+//           updatedAt: videoDetails.updated_at ? videoDetails.updated_at.toISOString() : new Date().toISOString()
+//       };
+//   } catch (error) {
+//       console.error("Error fetching video metadata:", error);
+//       throw error;
+//   }
+// }
 
 
-// Adapted to use updateVideoRecord
-const updateForVonageVideoMetadataUpload = async (
-  archiveId,
-  { title, summary, is_private, signed_url }
-) => {
-  try {
-    await updateVideoRecord(archiveId, {
-      title,
-      summary,
-      is_private,
-      signed_url,
-      archiveId,
-    });
-    console.log("Vonage video metadata updated for:", archiveId);
-  } catch (error) {
-    console.error("Error updating video metadata:", error);
-    throw error;
-  }
-};
+// // Adapted to use updateVideoRecord
+// const updateForVonageVideoMetadataUpload = async (
+//   archiveId,
+//   { title, summary, is_private, signed_url }
+// ) => {
+//   try {
+//     await updateVideoRecord(archiveId, {
+//       title,
+//       summary,
+//       is_private,
+//       signed_url,
+//       archiveId,
+//     });
+//     console.log("Vonage video metadata updated for:", archiveId);
+//   } catch (error) {
+//     console.error("Error updating video metadata:", error);
+//     throw error;
+//   }
+// };
 
-// Adapted to use updateVideoRecord
-const updateDatabaseWithVideoS3Url = async (archiveId, formData, s3Key) => {
-  const s3_url = `https://${process.env.BUCKET_NAME}.s3.amazonaws.com/${s3Key}`;
-  try {
-    // Assuming `formData` contains the other data like category, title, summary, etc.
-    // Make sure to map formData to the correct column names as well.
-    await updateVideoRecord(archiveId, {
-      ...formData,
-      is_private: formData.is_private, // Make sure formData uses the correct property names
-      archiveId: archiveId, // Corrected from archiveId to archiveId
-      s3_url, // Assuming this is correct and matches your column name
-    });
-    console.log("Database updated with S3 URL for:", archiveId);
-  } catch (error) {
-    console.error("Error updating video with S3 URL:", error);
-    throw error;
-  }
-};
+// // Adapted to use updateVideoRecord
+// const updateDatabaseWithVideoS3Url = async (archiveId, formData, s3Key) => {
+//   const s3_url = `https://${process.env.BUCKET_NAME}.s3.amazonaws.com/${s3Key}`;
+//   try {
+//     // Assuming `formData` contains the other data like category, title, summary, etc.
+//     // Make sure to map formData to the correct column names as well.
+//     await updateVideoRecord(archiveId, {
+//       ...formData,
+//       is_private: formData.is_private, // Make sure formData uses the correct property names
+//       archiveId: archiveId, // Corrected from archiveId to archiveId
+//       s3_url, // Assuming this is correct and matches your column name
+//     });
+//     console.log("Database updated with S3 URL for:", archiveId);
+//   } catch (error) {
+//     console.error("Error updating video with S3 URL:", error);
+//     throw error;
+//   }
+// };
 
-// Assuming this function is similar to updateDatabaseWithS3Url
-const updateDatabaseWithThumbnailS3Url = async (
-  archiveId,
-  formData,
-  thumbnailKey
-) => {
-  const thumbnail_url = `https://${process.env.BUCKET_NAME}.s3.amazonaws.com/${thumbnailKey}`;
-  try {
-    await updateVideoRecord(archiveId, { ...formData, thumbnail_url });
-    console.log("Database updated with thumbnail URL for:", archiveId);
-  } catch (error) {
-    console.error("Error updating thumbnail URL:", error);
-    throw error;
-  }
-};
+// // Assuming this function is similar to updateDatabaseWithS3Url
+// const updateDatabaseWithThumbnailS3Url = async (
+//   archiveId,
+//   formData,
+//   thumbnailKey
+// ) => {
+//   const thumbnail_url = `https://${process.env.BUCKET_NAME}.s3.amazonaws.com/${thumbnailKey}`;
+//   try {
+//     await updateVideoRecord(archiveId, { ...formData, thumbnail_url });
+//     console.log("Database updated with thumbnail URL for:", archiveId);
+//   } catch (error) {
+//     console.error("Error updating thumbnail URL:", error);
+//     throw error;
+//   }
+// };
 
 // only for replacement no 'video editing' full replacement
 const updateVideo = async (id, video) => {
@@ -357,10 +355,10 @@ export {
   getVideoByTitle,
   createVideo,
   createInitialVideoMetadata,
-  getVideoMetadata,
-  updateForVonageVideoMetadataUpload,
-  updateDatabaseWithVideoS3Url,
-  updateDatabaseWithThumbnailS3Url,
+//   getVideoMetadata,
+//   updateForVonageVideoMetadataUpload,
+//   updateDatabaseWithVideoS3Url,
+//   updateDatabaseWithThumbnailS3Url,
   updateVideo,
   deleteVideo,
 };
