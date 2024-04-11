@@ -14,9 +14,9 @@
   "author": "Team Tidbits",
   "license": "ISC",
   "dependencies": {
-    "@aws-sdk/client-s3": "^3.535.0",
-    "@aws-sdk/lib-storage": "^3.535.0",
-    "@aws-sdk/s3-request-presigner": "^3.535.0",
+    "@aws-sdk/client-s3": "^3.552.0",
+    "@aws-sdk/lib-storage": "^3.552.0",
+    "@aws-sdk/s3-request-presigner": "^3.552.0",
     "admin": "^1.4.1",
     "aws": "^0.0.3-2",
     "aws-sdk": "^2.1581.0",

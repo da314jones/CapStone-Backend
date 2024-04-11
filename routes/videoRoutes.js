@@ -1,6 +1,6 @@
 import express from "express";
 import videoController from "../controller/videoController.js";
-import vonageS3Controller from  "../controller/vonageS3Controller.js";
+import {processVideoData} from  "../controller/vonageS3Controller.js";
 const videos = express.Router();
 
 videos.post("/session", videoController.creatingSession);
@@ -11,11 +11,9 @@ videos.post("/start-recording", videoController.startVideoRecording);
 
 videos.post("/stop-recording", videoController.stopVideoRecording);
 
-videos.post("/download-archive", videoController.downloadArchive);
+videos.post('/uploadVideo/:archiveId', processVideoData)
 
-videos.post('/uploadVideo/:archiveId', vonageS3Controller.processVideoData)
-
-// videos.post("/webhook/vonage", vonageS3Controller.downloadAndUploadArchive);
+videos.get('/index', videoController.allVideos)
 
 export default videos;
 

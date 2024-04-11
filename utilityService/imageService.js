@@ -1,6 +1,11 @@
+import dotenv from "dotenv";
+dotenv.config();
 import ffmpeg from 'fluent-ffmpeg';
 
-function generateThumbnail(videoPath, thumbnailPath) {
+const videoPath = process.env.VIDEO_PATH;
+const thumbnailPath = process.env.THUMBNAIL_PATH;
+
+export function generateThumbnail(videoPath, archiveId, thumbnailPath) {
   return new Promise((resolve, reject) => {
     ffmpeg(videoPath)
       .on('end', function() {
@@ -13,9 +18,10 @@ function generateThumbnail(videoPath, thumbnailPath) {
       })
       .screenshots({
         count: 1,
-        folder: '/thumbnails',
+        folder: './thumbnails',
         size: '320x240',
-        filename: 'thumbnail-%b.png'
+        filename: `${archiveId}.png`
       });
   });
 }
+
