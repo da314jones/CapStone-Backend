@@ -9,6 +9,7 @@ import {
 import upload from "./uploadMiddleware.js";
 
 
+
 // POST route for file upload
 s3.post("/upload", upload.single("file"), uploadFile);
 
@@ -31,5 +32,10 @@ s3.delete(
 );
 
 s3.get("/list", listFiles);
+
+s3.use((err, req, res, next) => {
+  console.log.error(err.stack);
+  res.status(500).send('Something broke in S3 Controller!');
+})
 
 export default s3;

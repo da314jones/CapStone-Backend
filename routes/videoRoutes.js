@@ -1,19 +1,29 @@
 import express from "express";
-import videoController from "../controller/videoController.js";
+import { creatingSession, generatingToken, startVideoRecording, stopVideoRecording, listThumbnails, getVideoSigneUrl } from "../controller/videoController.js";
+import { processVideoData } from  "../controller/vonageS3Controller.js";
+
 const videos = express.Router();
 
-videos.post("/session", videoController.creatingSession);
+videos.post("/session", creatingSession);
 
-videos.get("/token/:sessionId", videoController.generatingToken);
+videos.get("/token/:sessionId", generatingToken);
 
-videos.post("/video-metadata/", videoController.createVideoMetadata);
+videos.post("/start-recording", startVideoRecording);
 
-videos.post("/start-recording", videoController.startVideoRecording);
+videos.post("/stop-recording", stopVideoRecording);
 
-videos.post("/stop-recording", videoController.stopVideoRecording);
+videos.post('/uploadVideo/:archiveId', processVideoData)
 
-// In your videoRoutes.js or wherever you define routes
-videos.get('/archive/:archiveId', videoController.getArchiveDetailsAndUploadToS3);
+videos.get('/index-thumbnails', listThumbnails)
+
+videos.get('/getSignedUrl/:s3_key', generatePresignedUrl)
+
+videos.use((err, req,res, next) => {
+    console.log.error(err.stack);
+    res.status(500).send('Something Broke in Video Controller!');
+})
 
 
 export default videos;
+
+

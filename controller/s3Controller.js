@@ -7,8 +7,9 @@ import {
 } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import {
+  getAllThumbnails,
   getAllVideos,
-  getVideoById,
+  getVideoByTitle,
   createVideo,
   updateVideo,
   deleteVideo,
@@ -20,7 +21,6 @@ dotenv.config();
 
 
 // AWS SDK Configuration
-// Credentials will be automatically sourced from environment variables
 const s3Client = new S3Client({
   region: process.env.AWS_REGION,
   credentials: {
@@ -29,31 +29,26 @@ const s3Client = new S3Client({
   },
 });
 
-// Example function to list files by user ID
-// const listFilesByUserId = async (userId) => {
-//   const prefix = `users/${userId}/`; // Adjust based on your actual file structure in S3
-//   const params = {
-//     Bucket: process.env.BUCKET_NAME,
-//     Prefix: prefix,
-//   };
+const uploadToS3 = async (filePath, key, metadata) => {
+  const fileStream = fs.createReadStream(filePath);
+  const uploadParams = {
+    Bucket: process.env.BUCKET_NAME,
+    Key: key,
+    Body: fileStream,
+    Metadata: metadata,
+  };
 
-//   try {
-//     const command = new ListObjectsV2Command(params);
-//     const data = await s3Client.send(command);
-//     return data.Contents.map((video) => ({
-//       name: video.Key,
-//       objectUrl: `https://${params.Bucket}.s3.${process.env.AWS_REGION}.amazonaws.com/${video.Key}`,
-//       size: video.Size,
-//       lastModified: video.LastModified,
-//     }));
-//   } catch (error) {
-//     console.error("Error listing files by user ID:", error);
-//     throw error;
-//   }
-// };
+  try {
+    await s3Client.send(new PutObjectCommand(uploadParams));
+    console.log(`Upload successful: ${key}`);
+    return `https://${process.env.BUCKET_NAME}.s3.amazonaws.com/${key}`;
+  } catch (error) {
+    console.error(`Upload failed for ${key}:`, error);
+    throw error;
+  }
+};
 
-
-export const uploadBufferToS3 = async (buffer, metaDataObject) => {
+ const uploadBufferToS3 = async (buffer, metaDataObject) => {
   const { user_id, title, ...rest }  = metaDataObject;
   const fileName = `${title}.mp4`;
   const s3Key = `users/${user_id}/${fileName}`
@@ -79,7 +74,7 @@ export const uploadBufferToS3 = async (buffer, metaDataObject) => {
 };
 
 
-const uploadFile = async (req, res) => {
+export const uploadFile = async (req, res) => {
   const { file } = req;
   const metaDataObject = req.body;
   if (!metaDataObject.user_id) {
@@ -88,7 +83,7 @@ const uploadFile = async (req, res) => {
   const user_id = req.body.user_id;
   const title = req.body.title || "Untitled";
   const summary = req.body.summary || "";
-  const isPrivate = req.body.isPrivate === "true";
+  const is_private = req.body.is_private === "true";
   const duration = parseInt(req.body.duration) || 0;
 
   const fileStream = fs.createReadStream(file.path);
@@ -100,7 +95,7 @@ const uploadFile = async (req, res) => {
     ContentType: file.mimetype,
     Metadata: {
       user_id: user_id.toString(),
-    }, // Assuming mimetype is provided by multer
+    }, 
   };
 
   try {
@@ -113,8 +108,8 @@ const uploadFile = async (req, res) => {
       user_id,
       title: req.body.title || "Untitled",
       summary: req.body.summary || "",
-      video_url: fileUrl,
-      isPrivate: req.body.isPrivate || false,
+      signed_url: fileUrl,
+      is_private: req.body.is_private || false,
       duration: req.body.duration || 0,
     });
     const newVideo = await createVideo(video);
@@ -123,7 +118,7 @@ const uploadFile = async (req, res) => {
       if (err) {
         console.error("Failed to delete temporary file:", err);
       }
-    }); // Cleans up the uploaded file from temporary storage
+    });
     if (req.file) {
       console.log("Uploading file:", req.file.originalname);
       res.status(200).json({
@@ -141,39 +136,10 @@ const uploadFile = async (req, res) => {
   }
 };
 
-// // direct uploads to s3
-// const generateUploadPresignedUrl = async (req, res) => {
-//   const userId = req.body.userId;
-//   const fileName = `users/${userId}/${req.body.fileName}`;
-//   try {
-//     const command = new PutObjectCommand({
-//       Bucket: process.env.BUCKET_NAME,
-//       Key: fileName,
-//     });
-//     const url = await getSignedUrl(s3Client, command, { Expires: 60 * 5 });
-//     res.status(200).send({ url });
-//   } catch (error) {
-//     console.error("Error generating presigned URL for upload:", error);
-//     res.Status(500).send(error.message || "Internal Server Error");
-//   }
-// };
-
-// const generateDownloadPresignedUrl = async (req, res) => {
-//   const { fileName } = req.params;
-//   try {
-//     const command = new GetObjectCommand({
-//       Bucket: process.env.AWS_S3_BUCKET_NAME,
-//       Key: fileName,
-//     });
-//     const url = await getSignedUrl(s3Client, command, { expiresIn: 300 });
-//     res.status(200).json({ url });
-//   } catch (error) {
-//     console.error("Error generating download presigned URL:", error);
-//   }
-// };
-
-const downloadFile = async (req, res) => {
+export const downloadFile = async (req, res) => {
   console.log("Controller: downloadFile called for", req.params.filename);
+  const { filename, title } = req.params;
+  const newFileName = `${title}`.mp4
   const params = {
     Bucket: process.env.BUCKET_NAME,
     Key: req.params.filename,
@@ -188,6 +154,7 @@ const downloadFile = async (req, res) => {
     console.log(`Successfully downloaded ${params.Key}`);
 
     res.set("Content-Type", ContentType);
+    res.set("Content-Dispostion", `attachment; filename="${newFileName}"`)
     Body.pipe(res);
   } catch (error) {
     console.error("Error downloading file:", error);
@@ -195,7 +162,7 @@ const downloadFile = async (req, res) => {
   }
 };
 
-const deleteFile = async (req, res) => {
+export const deleteFile = async (req, res) => {
   console.log("Controller: deleteFile called for", req.params.filename);
   const params = {
     Bucket: process.env.BUCKET_NAME,
@@ -216,44 +183,40 @@ const deleteFile = async (req, res) => {
   }
 };
 
-const listFiles = async (req, res) => {
+
+
+export const listFiles = async (req, res) => {
   const params = {
     Bucket: process.env.BUCKET_NAME,
   };
   try {
-    console.log(`Listing files from S3 bucket: ${params.Bucket}`);
     const command = new ListObjectsV2Command(params);
-    const data = await s3Client.send(command);
-    const videoWithSignedUrls = await Promise.all(
-      data.Contents.map(async (video) => {
-        const urlCommand = new GetObjectCommand({
-          Bucket: params.Bucket,
-          Key: video.Key,
-        });
-        const signedUrl = await getSignedUrl(s3Client, urlCommand, {
-          expiresIn: 3600,
-        });
-        return {
-          ...video,
-          signedUrl,
-        };
-      })
-    );
-    res.status(200).json({
-      message: "Successfully retrieved bucket list:",
-      videoWithSignedUrls,
+    const s3Data = await s3Client.send(command);
+    const videosFromDb = await getAllVideos();
+    
+    const videoWithSignedUrls = s3Data.Contents.map(s3Video => {
+      const videoMetadata = videosFromDb.find(v => v.s3_key === s3Video.Key);
+      const signedUrl = `https://${params.BUCKET_NAME}.s3.${process.env.AWS_REGION}.amazonaws.com/${s3Video.Key}`;
+      
+      return {
+        ...s3Video,
+        ...videoMetadata,
+        signedUrl: signedUrl,
+      };
     });
+    
+    res.json({ message: "Successfully retrieved bucket list:", videoWithSignedUrls });
   } catch (error) {
     console.error("Error listing files:", error);
     res.status(500).json({ message: "Error listing files from S3" });
   }
 };
 
-export {
-  // listFilesByUserId,
+
+export default {
+  uploadToS3,
+  uploadBufferToS3,
   uploadFile,
-  // generateUploadPresignedUrl,
-  // generateDownloadPresignedUrl,
   downloadFile,
   deleteFile,
   listFiles,
