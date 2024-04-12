@@ -234,7 +234,7 @@ export const listThumbnails = async (req, res) => {
             Bucket: process.env.BUCKET_NAME,
             Key: thumbnail.thumbnail_key,
           }),
-          { expiresIn: 3600 } 
+          { expiresIn: 86400 } 
         );
         return {
           ...thumbnail,
@@ -248,6 +248,25 @@ export const listThumbnails = async (req, res) => {
     res.status(500).json({ message: "Failed to list thumbnails", error: error.toString() });
   }
 };
+
+export const generateSignedUrl = async (req, res) => {
+  const s3Key = req.params[0];
+  try {
+    const signedVideoUrl = await getSignedUrl(
+      s3Client,
+      new GetObjectCommand({
+        Bucket: process.env.BUCKET_NAME,
+        Key: s3Key,
+      }),
+      { expiresIn: 7200 }
+    );
+    res.json({ signedVideoUrl });
+  } catch (error) {
+    console.error("Error generating signed URL:", error);
+    res.status(500).json({ message: "Failed to generate signed URL", error: error.toString() });
+  }
+};
+
 
 
 export const allVideos = async (req, res) => {

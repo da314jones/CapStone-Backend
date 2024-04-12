@@ -151,6 +151,9 @@ const getAllVideos = async () => {
 };
 
 
+
+
+
 const getVideoByTitle = async (title) => {
   try {
     const videoByTitle = await db.one(
@@ -364,13 +367,13 @@ export {
   updateDatabaseWithVideoAndThumbnail,
   getAllThumbnails,
   getAllVideos,
+  //   getVideoMetadata,
+  //   updateForVonageVideoMetadataUpload,
+  //   updateDatabaseWithVideoS3Url,
+  //   updateDatabaseWithThumbnailS3Url,
   getVideoByTitle,
-  createVideo,
   createInitialVideoMetadata,
-//   getVideoMetadata,
-//   updateForVonageVideoMetadataUpload,
-//   updateDatabaseWithVideoS3Url,
-//   updateDatabaseWithThumbnailS3Url,
+  createVideo,
   updateVideo,
   deleteVideo,
 };
