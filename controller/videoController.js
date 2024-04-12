@@ -22,7 +22,7 @@ const thumbnailPath = process.env.THUMBNAIL_PATH;
 
 if (!videoPath || !thumbnailPath) {
   console.error(
-    "Base paths are not defined. Please check your environment variables."
+    "FilePaths are not defined. Please check your environment variables."
   );
   process.exit(1); 
 }
@@ -261,7 +261,7 @@ export const allVideos = async (req, res) => {
             Bucket: process.env.BUCKET_NAME,
             Key: video.s3_key,
           }),
-          { expiresIn: 3600 }
+          { expiresIn: 86400 }
         );
 
         const thumbnailSignedUrl = await getSignedUrl(
