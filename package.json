@@ -19,7 +19,7 @@
     "@aws-sdk/s3-request-presigner": "^3.535.0",
     "admin": "^1.4.1",
     "aws": "^0.0.3-2",
-    "aws-sdk": "^2.1581.0",
+    "aws-sdk": "^2.1598.0",
     "bcrypt": "^5.1.1",
     "bcryptjs": "^2.4.3",
     "configure": "^0.0.1",

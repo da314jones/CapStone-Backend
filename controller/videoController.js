@@ -7,22 +7,14 @@ import fs from "fs";
 import path from "path";
 import {
   S3Client,
-  PutObjectCommand,
-  ListObjectsV2Command,
   GetObjectCommand,
 } from "@aws-sdk/client-s3";
-import { S3RequestPresigner } from "@aws-sdk/s3-request-presigner";
-import { fromIni } from 'aws-sdk/credential-providers';
-import { HttpRequest } from '@smithy/protocol-http';
-import { parseUrl } from '@smithy/url-parser';
-import { formatUrl } from 'aws-sdk/util-format-url';
-import { Hash } from '@smithy/hash-node';
-import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { generateThumbnail } from "../utilityService/imageService.js";
+import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import {
   createVideoEntry,
   getAllVideos,
-  getVideoByTitle,
+  getAllThumbnails,
 } from "../queries/videos.js";
 
 const videoPath = process.env.VIDEO_PATH;
@@ -32,7 +24,7 @@ if (!videoPath || !thumbnailPath) {
   console.error(
     "Base paths are not defined. Please check your environment variables."
   );
-  process.exit(1); // Stops execution if paths are not defined
+  process.exit(1); 
 }
 
 const opentok = new OpenTok(
@@ -102,7 +94,7 @@ export const startVideoRecording = async (req, res) => {
               error: error.message,
             });
         }
-        console.log("Recording sarted:", archive);
+        console.log("Recording started:", archive);
         try {
           const createdVideo = await createVideoEntry(user_id, archive.id);
           res.status(201).json({
@@ -231,96 +223,32 @@ export const stopVideoRecording = async (req, res) => {
   }
 };
 
-export const generatePresignedUrl = async () => {
-  try {
-    const command = new GetObjectCommand({
-      Bucket: process.env.BUCKET_NAME,
-      Key: process.env.AWS_SECRET_ACCESS_KEY,
-    });
-    const url = await getSignedUrl(s3Client, command, { expiresIn: 3600 });
-    console.log("Presigned URL:", url);
-    return url;
-  } catch (error) {
-    console.error("Error generating presigned URL:", error);
-  }
-};
-
-
-//Create list only with image population
 export const listThumbnails = async (req, res) => {
   try {
-    const thumbnails = await getAllThumbnails();
-
+    const thumbnails = await getAllThumbnails();  
     const thumbnailSignedUrls = await Promise.all(
-      thumbnails.map(async (video) => {
-        const command = new GetObjectCommand({
-          Bucket: process.env.BUCKET_NAME,
-          Key: video.thumbnail_key,
-        });
-
-        const signedUrl = await getSignedUrl(s3Client, command, {
-          expiresIn: 86400,
-        });
-
+      thumbnails.map(async (thumbnail) => {
+        const signedUrl = await getSignedUrl(
+          s3Client,
+          new GetObjectCommand({
+            Bucket: process.env.BUCKET_NAME,
+            Key: thumbnail.thumbnail_key,
+          }),
+          { expiresIn: 3600 } 
+        );
         return {
-          ...video,
+          ...thumbnail,
           signedUrl,
         };
       })
     );
-
-    res.json({
-      message: "Successfully retrieved thumbnails with signed URLs",
-      thumbnailSignedUrls,
-    });
+    res.json({ thumbnailSignedUrls });
   } catch (error) {
-    console.error("Error fetching thumbnails:", error);
-    res
-      .status(500)
-      .json({
-        message: "Error listing thumbnails from S3",
-        error: error.toString(),
-      });
+    console.error("Error listing thumbnails:", error);
+    res.status(500).json({ message: "Failed to list thumbnails", error: error.toString() });
   }
 };
 
-//
- const getSignedUrl = async (req, res) => {
-  const { s3_key } = req.params;
-  const { BUCKET_NAME, AWS_REGION } = process.env;
-
-  try {
-    const signedUrl = await generateSignedUrl({ region: AWS_REGION, bucket: BUCKET_NAME, key: s3_key });
-    res.json({ signedUrl });
-  } catch (error) {
-    console.error('Failed to generate signed URL:', error);
-    res.status(500).json({ message: 'Failed to generate signed URL' });
-  }
-};
-
-const generatePresignedUrl = async ({ region, bucket, key }) => {
-  const url = parseUrl(`https://${bucket}.s3.${region}.amazonaws.com/${key}`);
-  const presigner = new S3RequestPresigner({
-    credentials: fromIni(),
-    region,
-    sha256: Hash.bind(null, "sha256"),
-  });
-
-  const signedUrlObject = await presigner.presign(new HttpRequest(url));
-  return formatUrl(signedUrlObject);
-};
-
-const createPresignedUrl = async ({ region, bucket, key }) => {
-  const url = parseUrl(`https://${bucket}.s3.${region}.amazonaws.com/${key}`);
-  const presigner = new S3RequestPresigner({
-    credentials: fromIni(),
-    region,
-    sha256: Hash.bind(null, "sha256"),
-  });
-
-  const signedUrlObject = await presigner.presign(new HttpRequest(url));
-  return formatUrl(signedUrlObject);
-};
 
 export const allVideos = async (req, res) => {
   try {
@@ -375,6 +303,7 @@ const videoByTitle = async (req, res) => {
   }
 };
 
+
 // export const updateVideoDetails = async (req, res) => {
 //   const { archiveId } = req.params;
 //   const { title, summary, is_private, signed_url } = req.body;
@@ -410,8 +339,10 @@ export default {
   startVideoRecording,
   stopVideoRecording,
   listThumbnails,
-  generatePresignedUrl,
   downloadArchive,
   // updateVideoDetails,
   // deleteVideoMetadata,
 };
+
+
+
