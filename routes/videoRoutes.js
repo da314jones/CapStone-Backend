@@ -1,12 +1,12 @@
 import express from "express";
-import { creatingSession, generatingToken, startVideoRecording, stopVideoRecording, listThumbnails, getVideoSigneUrl } from "../controller/videoController.js";
+import { creatingSession, generatingToken, startVideoRecording, stopVideoRecording, listThumbnails } from "../controller/videoController.js";
 import { processVideoData } from  "../controller/vonageS3Controller.js";
 
 const videos = express.Router();
 
 videos.post("/session", creatingSession);
 
-videos.get("/token/:sessionId", generatingToken);
+videos.get("/token/:sessionId", generatingToken);   
 
 videos.post("/start-recording", startVideoRecording);
 
@@ -14,9 +14,9 @@ videos.post("/stop-recording", stopVideoRecording);
 
 videos.post('/uploadVideo/:archiveId', processVideoData)
 
-videos.get('/index-thumbnails', listThumbnails)
+videos.get('/index-thumbnails', listThumbnails);
 
-videos.get('/getSignedUrl/:s3_key', generatePresignedUrl)
+videos.get('/getSignedUrl/:s3_key', )
 
 videos.use((err, req,res, next) => {
     console.log.error(err.stack);
