@@ -185,21 +185,25 @@ const insertVideoMetadata = async (videoData) => {
   console.log(`Video metadata inserted for user ID: ${user_id}`);
 }
 
-export async function getSignedUrlsForPng(db) {
+const getSignedUrlsForPng = async (thumbnailKey) => {
   try {
       const query = `
-          SELECT s3_key
+          SELECT thumbnail_key
           FROM videos
-          WHERE s3_key LIKE '%.png';
+          WHERE thumbnail_key LIKE '%.png';
       `;
-      const result = await db.any(query);
-      const s3Keys = result.map(row => row.s3_key);
-      return s3Keys;
+      console.log("Executing query:", query);
+      const result = await db.any(query, [thumbnailKey]);
+      console.log("Query result:", result);
+      const thumbnailKeys = result.map(row => row.thumbnail_key);
+      console.log("Thumbnail keys:", thumbnailKeys);
+      return thumbnailKeys;
   } catch (error) {
-      console.error("Error fetching S3 keys for PNG files:", error);
+      console.error("Error fetching thumbnaiil keys for PNG files:", error);
       throw error; 
   }
 }
+
 
 
 
@@ -413,6 +417,7 @@ export {
   getAllThumbnails,
   checkAndInsertUser,
   insertVideoMetadata,
+  getSignedUrlsForPng,
   getAllVideos,
   insertVideoEntry,
   ensureUserInDatabase,
