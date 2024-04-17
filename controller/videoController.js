@@ -36,7 +36,7 @@ if (!videoPath || !thumbnailPath) {
   );
   process.exit(1); 
 }
-
+// 
 const opentok = new OpenTok(
   process.env.VONAGE_API_KEY,
   process.env.VONAGE_SECRET
@@ -422,3 +422,22 @@ export default {
   downloadArchive,
   stopVideoRecording,
 };
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+//correction env
