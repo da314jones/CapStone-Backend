@@ -233,15 +233,15 @@ export async function processS3Objects(db) {
           const metadataContent = metaData.Metadata;
 
           if (metadataContent && metadataContent.user) {
-              const userData = JSON.parse(metadataContent.user); // Parse the user data JSON string
-              await checkAndInsertUser(metadataContent.user); // Pass the entire user object as a JSON string
+              const userData = JSON.parse(metadataContent.user);
+              await checkAndInsertUser(metadataContent.user);
               const videoData = {
                   user_id: userData.user_id,
-                  firstName: userData.firstName, // Extract firstName from user data
-                  lastName: userData.lastName,   // Extract lastName from user data
-                  email: userData.email,         // Extract email from user data
-                  photo_url: userData.photo_url, // Extract photo_url from user data
-                  created_at: userData.created_at, // Extract created_at from user data
+                  firstName: userData.firstName, 
+                  lastName: userData.lastName,   
+                  email: userData.email,         
+                  photo_url: userData.photo_url,
+                  created_at: userData.created_at, 
                   category: metadataContent.category,
                   title: metadataContent.title,
                   summary: metadataContent.summary,
