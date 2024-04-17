@@ -3,6 +3,7 @@ import fs from "fs";
 import path from "path";
 import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
 import {
+  getUserById,
   getVideoByArchiveId,
   updateDatabaseWithVideoAndThumbnail,
 } from "../queries/videos.js";
@@ -17,7 +18,7 @@ const s3Client = new S3Client({
   },
 });
 
-const uploadFileToS3 = async (filePath, s3Key, metadata) => {
+const uploadFileToS3 = async (filePath, s3Key, metadata, userEntry) => {
   const fileStream = fs.createReadStream(filePath);
   const uploadParams = {
     Bucket: process.env.BUCKET_NAME,
@@ -28,7 +29,8 @@ const uploadFileToS3 = async (filePath, s3Key, metadata) => {
       summary: metadata.summary,
       category: metadata.category || "Default Category",
       isPrivate: metadata.is_private ? metadata.is_private.toString() : "false",
-      source: metadata.source || "Unknown",
+      source: metadata.source || "Vonage",
+      user: JSON.stringify(userEntry),
     },
   };
 
@@ -62,6 +64,12 @@ const processVideoData = async (req, res) => {
   const { archiveId } = req.params;
   const formData = req.body;
   const videoDetails = await getVideoByArchiveId(archiveId);
+  const userId = videoDetails.user_id;
+  const userEntry = await getUserById(userId);
+
+  if (!userEntry) {
+    return res.status(404).json({ message: 'User not found with userId: ' + userId })
+  }
 
   if (!videoDetails) {
     return res
@@ -69,7 +77,6 @@ const processVideoData = async (req, res) => {
       .json({ message: "Video not found with archiveId: " + archiveId });
   }
 
-  const userId = videoDetails.user_id;
   const sanitizedTitle = formData.title.replace(/[^a-zA-Z0-9-_]+/g, "-");
   const videoS3Key = `user/${userId}/${sanitizedTitle}.mp4`;
   const thumbnailS3Key = `user/${userId}/${sanitizedTitle}.png`;
@@ -78,8 +85,8 @@ const processVideoData = async (req, res) => {
 
   try {
     const [videoUploadResult, thumbnailUploadResult] = await Promise.all([
-      uploadFileToS3(videoFilePath, videoS3Key, formData),
-      uploadFileToS3(thumbnailFilePath, thumbnailS3Key, formData),
+      uploadFileToS3(videoFilePath, videoS3Key, formData, userEntry),
+      uploadFileToS3(thumbnailFilePath, thumbnailS3Key, formData, userEntry),
     ]);
 
     deleteFile(videoFilePath);
@@ -95,6 +102,7 @@ const processVideoData = async (req, res) => {
         summary: formData.summary,
         category: formData.category || "Default Category",
         is_private: formData.is_private || false,
+        user: userEntry,
       }
     );
     console.log({

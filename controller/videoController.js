@@ -1,4 +1,3 @@
-// videoController.js
 import dotenv from "dotenv";
 dotenv.config();
 import fetch from "node-fetch";
@@ -7,14 +6,15 @@ import fs from "fs";
 import path from "path";
 import {
   S3Client,
+  ListObjectsV2Command,
   GetObjectCommand,
+  HeadObjectCommand,
 } from "@aws-sdk/client-s3";
 import { generateThumbnail } from "../utilityService/imageService.js";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import {
   createVideoEntry,
   getAllVideos,
-  getAllThumbnails,
 } from "../queries/videos.js";
 
 const videoPath = process.env.VIDEO_PATH;
@@ -22,7 +22,7 @@ const thumbnailPath = process.env.THUMBNAIL_PATH;
 
 if (!videoPath || !thumbnailPath) {
   console.error(
-    "Base paths are not defined. Please check your environment variables."
+    "FilePaths are not defined. Please check your environment variables."
   );
   process.exit(1); 
 }
@@ -39,6 +39,7 @@ const s3Client = new S3Client({
     secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
   },
 });
+const BUCKET_NAME = process.env.BUCKET_NAME
 
 export const creatingSession = async (req, res) => {
   opentok.createSession({ mediaMode: "routed" }, function (error, session) {
@@ -126,12 +127,8 @@ export const startVideoRecording = async (req, res) => {
 
 const downloadArchive = async (archiveUrl, archiveId) => {
   const filename = `${archiveId}.mp4`;
-  const filePath =
-    "/Users/djones/Desktop/working-repository/10.2/MODULE_6_CAPSTONE/Tidbits/CapStone-Backend/videos/" +
-    filename;
-
-  const directory =
-    "/Users/djones/Desktop/working-repository/10.2/MODULE_6_CAPSTONE/Tidbits/CapStone-Backend/videos";
+  const directory = "./videos/";
+  const filePath = directory + filename;
 
   try {
     await fs.promises.mkdir(directory, { recursive: true });
@@ -223,49 +220,57 @@ export const stopVideoRecording = async (req, res) => {
   }
 };
 
-export const listThumbnails = async (req, res) => {
+
+export const processS3Objects = async (req, res) => {
+  let isTruncated = true;
+  let continuationToken;
+
   try {
-    const thumbnails = await getAllThumbnails();  
-    const thumbnailSignedUrls = await Promise.all(
-      thumbnails.map(async (thumbnail) => {
-        const signedUrl = await getSignedUrl(
-          s3Client,
-          new GetObjectCommand({
-            Bucket: process.env.BUCKET_NAME,
-            Key: thumbnail.thumbnail_key,
-          }),
-          { expiresIn: 86400 } 
-        );
-        return {
-          ...thumbnail,
-          signedUrl,
+    const allObjects = [];
+    while (isTruncated) {
+      const listParams = {
+        Bucket: BUCKET_NAME,
+        ContinuationToken: continuationToken
+      };
+
+      const listCommand = new ListObjectsV2Command(listParams);
+      const listData = await s3Client.send(listCommand);
+
+      for (const object of listData.Contents) {
+        const headParams = {
+          Bucket: BUCKET_NAME,
+          Key: object.Key
         };
-      })
-    );
-    res.json({ thumbnailSignedUrls });
-  } catch (error) {
-    console.error("Error listing thumbnails:", error);
-    res.status(500).json({ message: "Failed to list thumbnails", error: error.toString() });
+        console.log("Batch of objects:", listData.Contents);
+        
+        const headCommand = new HeadObjectCommand(headParams);
+        const metaData = await s3Client.send(headCommand);
+
+        console.log("Metadata for object", object.Key, ":", metaData);
+        allObjects.push({
+          Key: object.Key,
+          LastModified: object.LastModified,
+          Size: object.Size,
+          ContentType: metaData.ContentType,
+          Metadata: metaData.Metadata,
+          ETag: object.ETag,
+          StorageClass: object.StorageClass
+        });
+      }
+
+      isTruncated = listData.IsTruncated;
+      continuationToken = listData.NextContinuationToken;
+    }
+
+    res.json(allObjects);
+  } catch (err) {
+    console.error("Error in fetching objects or metadata:", err);
+    res.status(500).send("Failed to retrieve objects and metadata from S3");
   }
 };
 
-export const generateSignedUrl = async (req, res) => {
-  const s3Key = req.params[0];
-  try {
-    const signedVideoUrl = await getSignedUrl(
-      s3Client,
-      new GetObjectCommand({
-        Bucket: process.env.BUCKET_NAME,
-        Key: s3Key,
-      }),
-      { expiresIn: 7200 }
-    );
-    res.json({ signedVideoUrl });
-  } catch (error) {
-    console.error("Error generating signed URL:", error);
-    res.status(500).json({ message: "Failed to generate signed URL", error: error.toString() });
-  }
-};
+
+
 
 
 
@@ -280,7 +285,7 @@ export const allVideos = async (req, res) => {
             Bucket: process.env.BUCKET_NAME,
             Key: video.s3_key,
           }),
-          { expiresIn: 3600 }
+          { expiresIn: 86400 }
         );
 
         const thumbnailSignedUrl = await getSignedUrl(
@@ -289,7 +294,7 @@ export const allVideos = async (req, res) => {
             Bucket: process.env.BUCKET_NAME,
             Key: video.thumbnail_key,
           }),
-          { expiresIn: 3600 }
+          { expiresIn: 86400 }
         );
 
         return {
@@ -323,45 +328,12 @@ const videoByTitle = async (req, res) => {
 };
 
 
-// export const updateVideoDetails = async (req, res) => {
-//   const { archiveId } = req.params;
-//   const { title, summary, is_private, signed_url } = req.body;
-
-//   try {
-//     const updatedVideo = await updateVonageVideoMetadata(archiveId, { title, summary, is_private, signed_url });
-//     res.json(updatedVideo);
-//   } catch (error) {
-//     res.status(500).json({ message: "Failed to update video metadata", error });
-//   }
-// };
-
-// const deleteVideoMetadata = async (req, res) => {
-//   const videoId = req.params.id;
-//   try {
-//     const deletedVideo = await deleteVideo(videoId);
-//     if (deletedVideo) {
-//       res.json({ message: "Video deleted successfully", video: deletedVideo });
-//     } else {
-//       res.status(404).json("Video not found c");
-//     }
-//   } catch (error) {
-//     console.error("Error deleting video c:", error);
-//     res.status(500).json("Error deleting video c");
-//   }
-// };
-
 export default {
   allVideos,
   videoByTitle,
   creatingSession,
   generatingToken,
   startVideoRecording,
-  stopVideoRecording,
-  listThumbnails,
   downloadArchive,
-  // updateVideoDetails,
-  // deleteVideoMetadata,
+  stopVideoRecording,
 };
-
-
-

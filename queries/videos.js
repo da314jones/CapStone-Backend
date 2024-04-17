@@ -1,6 +1,5 @@
 import { db } from "../db/dbConfig.js";
 
-
 //for tokbox
 //confirmed
 const createUserIfNotExists = async (
@@ -10,13 +9,11 @@ const createUserIfNotExists = async (
   email = "",
   photoUrl = ""
 ) => {
-  // Check if user exists
   const userExists = await db.oneOrNone(
     "SELECT 1 FROM users WHERE user_id = $1",
     [userId]
   );
   if (!userExists) {
-    // Insert user with the exact casing for column names
     await db.none(
       'INSERT INTO users ("user_id", "firstName", "lastName", "email", "photo_url") VALUES ($1, $2, $3, $4, $5)',
       [userId, firstName, lastName, email, photoUrl]
@@ -24,6 +21,25 @@ const createUserIfNotExists = async (
     console.log(`User ${userId} created.`);
   }
 };
+
+
+const getUserById = async (userId) => {
+  try {
+    const user = await db.oneOrNone(
+      `SELECT user_id, "firstName", "lastName", email, photo_url, created_at FROM users WHERE user_id = $1`,
+      [userId]
+    );
+    console.log('Retrieved:', user);
+    return user;
+  } catch (error) {
+    console.error('Failed to fetch user:', error);
+    throw error;
+  }
+};
+
+
+
+
 
 //confirmed usage
 const createVideoEntry = async (userId, archiveId) => {
@@ -45,6 +61,22 @@ const createVideoEntry = async (userId, archiveId) => {
     throw error;
   }
 };
+
+
+async function createS3UsersVideoEntry(videoData) {
+  try {
+    const insertedVideo = await db.one(
+      `INSERT INTO videos (user_id, "archiveId", category, title, summary, s3_key, thumbnail_key, is_private) VALUES 
+      ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
+      [videoData.user_id, videoData.archiveId, videoData.category, videoData.title, videoData.summary, videoData.s3_key, videoData.thumbnail_key, videoData.is_private]
+    );
+    console.log("New video entry created:", insertedVideo);
+    return insertedVideo;
+  } catch (error) {
+    console.error("Error creating video entry:", error);
+    throw error;
+  }
+}
 
 //confirmed
 const getVideoByArchiveId = async (archiveId) => {
@@ -128,16 +160,37 @@ const updateDatabaseWithVideoAndThumbnail = async (archiveId, videoS3Key, thumbn
   }
 };
 
-//confirmed
-const getAllThumbnails = async () => {
+
+const checkUserFromMetadata = async (req, res) => {
+  const objectKey = req.params.key;
+
   try {
-    const allThumbnails = await db.any("SELECT * FROM videos WHERE thumbnail_key IS NOT NULL");
-    return allThumbnails;
-  } catch (error) {
-    console.error("Error fetching all videos:", error);
-    throw error;
+    const headParams = {
+      Bucket: bucketName,
+      Key: objectKey,
+    };
+
+    const { Metadata } = await s3Client.send(new HeadObjectCommand(headParams));
+    if (!Metadata.user) {
+      return res.status(404).json({ message: "No user metadata available" });
+    }
+
+    const userMetadata = JSON.parse(Metadata.user);
+    const userId = userMetadata.user_id;
+
+    console.log("Extracted User ID:", userId);
+    const userData = await db.oneOrNone('SELECT * FROM users WHERE user_id = $1', [userId]);
+    if (userData) {
+      res.json({ message: "User exists", userData });
+    } else {
+      res.status(404).json({ message: "User does not exist" });
+    }
+  } catch (err) {
+    console.error("Error during S3 metadata retrieval or database query:", err);
+    res.status(500).send("Failed to retrieve user information");
   }
 };
+
 
 //confirmed for local
 const getAllVideos = async () => {
@@ -151,6 +204,71 @@ const getAllVideos = async () => {
 };
 
 
+//
+const getAllThumbnails = async () => {
+  try {
+    const allThumbnails = await db.any("SELECT * FROM videos WHERE thumbnail_key IS NOT NULL");
+    return allThumbnails;
+  } catch (error) {
+    console.error("Error fetching all videos:", error);
+    throw error;
+  }
+};
+
+
+const ensureUserInDatabase = async (metadata) => {
+  const userId = metadata.user_id;
+  try {
+    const userExists = await db.oneOrNone('SELECT user_id FROM users WHERE user_id = $1', [userId]);
+    if (!userExists) {
+      await addUserToDatabase(metadata);
+      console.log(`User ${userId} added to the database.`);
+    } else {
+      console.log(`User ${userId} already exists in the database.`);
+    }
+  } catch (error) {
+    console.error(`Error ensuring user ${userId} in the database:`, error);
+    throw error;
+  }
+};
+
+
+const insertVideoEntry = async (videoData) => {
+  const {
+      userId,
+      archiveId = null,
+      category = 'Tutorial', 
+      title = 'Untitled',
+      summary = 'No summary provided',
+      ai_summary = 'AI summary not available',
+      isPrivate = true,
+      s3Key,
+      thumbnailKey,
+      source = 'Vonage', 
+      signedUrl = null 
+  } = videoData;
+
+  try {
+      const query = `
+          INSERT INTO videos (
+              user_id, archiveId, category, title, summary, ai_summary,
+              is_private, s3_key, thumbnail_key, source, signed_url, created_at, updated_at
+          ) VALUES (
+              $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+          ) RETURNING *;`;
+
+      const params = [
+          userId, archiveId, category, title, summary, ai_summary,
+          isPrivate, s3Key, thumbnailKey, source, signedUrl
+      ];
+      const result = await db.one(query, params);
+      console.log('Video entry created:', result);
+      return result;
+  } catch (error) {
+      console.error('Failed to insert video entry:', error);
+      throw error;
+  }
+};
 
 
 
@@ -239,97 +357,6 @@ const createVideo = async (video) => {
 
 
 
-
-
-
-
-
-
-
-
-
-
-// async function getVideoMetadata(archiveId) {
-//   try {
-//       const videoDetails = await getVideoByArchiveId(archiveId);
-//       if (!videoDetails) {
-//           throw new Error("No video found for the given archive ID");
-//       }
-      
-//       return {
-//           userId: videoDetails.user_id,
-//           archiveId: videoDetails.archiveId,
-//           category: videoDetails.category,
-//           title: videoDetails.title,
-//           summary: videoDetails.summary,
-//           aiSummary: videoDetails.ai_summary,
-//           isPrivate: videoDetails.is_private.toString(),  
-//           source: videoDetails.source || 'Vonage', 
-//           createdAt: videoDetails.created_at ? videoDetails.created_at.toISOString() : new Date().toISOString(),
-//           updatedAt: videoDetails.updated_at ? videoDetails.updated_at.toISOString() : new Date().toISOString()
-//       };
-//   } catch (error) {
-//       console.error("Error fetching video metadata:", error);
-//       throw error;
-//   }
-// }
-
-
-// // Adapted to use updateVideoRecord
-// const updateForVonageVideoMetadataUpload = async (
-//   archiveId,
-//   { title, summary, is_private, signed_url }
-// ) => {
-//   try {
-//     await updateVideoRecord(archiveId, {
-//       title,
-//       summary,
-//       is_private,
-//       signed_url,
-//       archiveId,
-//     });
-//     console.log("Vonage video metadata updated for:", archiveId);
-//   } catch (error) {
-//     console.error("Error updating video metadata:", error);
-//     throw error;
-//   }
-// };
-
-// // Adapted to use updateVideoRecord
-// const updateDatabaseWithVideoS3Url = async (archiveId, formData, s3Key) => {
-//   const s3_url = `https://${process.env.BUCKET_NAME}.s3.amazonaws.com/${s3Key}`;
-//   try {
-//     // Assuming `formData` contains the other data like category, title, summary, etc.
-//     // Make sure to map formData to the correct column names as well.
-//     await updateVideoRecord(archiveId, {
-//       ...formData,
-//       is_private: formData.is_private, // Make sure formData uses the correct property names
-//       archiveId: archiveId, // Corrected from archiveId to archiveId
-//       s3_url, // Assuming this is correct and matches your column name
-//     });
-//     console.log("Database updated with S3 URL for:", archiveId);
-//   } catch (error) {
-//     console.error("Error updating video with S3 URL:", error);
-//     throw error;
-//   }
-// };
-
-// // Assuming this function is similar to updateDatabaseWithS3Url
-// const updateDatabaseWithThumbnailS3Url = async (
-//   archiveId,
-//   formData,
-//   thumbnailKey
-// ) => {
-//   const thumbnail_url = `https://${process.env.BUCKET_NAME}.s3.amazonaws.com/${thumbnailKey}`;
-//   try {
-//     await updateVideoRecord(archiveId, { ...formData, thumbnail_url });
-//     console.log("Database updated with thumbnail URL for:", archiveId);
-//   } catch (error) {
-//     console.error("Error updating thumbnail URL:", error);
-//     throw error;
-//   }
-// };
-
 // only for replacement no 'video editing' full replacement
 const updateVideo = async (id, video) => {
   const { title, summary, category, signed_url, is_private, s3_key, source } =
@@ -360,20 +387,19 @@ const deleteVideo = async (id) => {
 
 export {
   createUserIfNotExists,
+  getUserById,
   createVideoEntry,
+  createS3UsersVideoEntry,
   getVideoByArchiveId,
   updateVideoRecord,
   updateArchiveIdForUser,
-  updateDatabaseWithVideoAndThumbnail,
-  getAllThumbnails,
+  updateDatabaseWithVideoAndThumbnail,  getAllThumbnails,
   getAllVideos,
-  //   getVideoMetadata,
-  //   updateForVonageVideoMetadataUpload,
-  //   updateDatabaseWithVideoS3Url,
-  //   updateDatabaseWithThumbnailS3Url,
+  insertVideoEntry,
+  ensureUserInDatabase,
   getVideoByTitle,
-  createInitialVideoMetadata,
   createVideo,
+  createInitialVideoMetadata,
   updateVideo,
   deleteVideo,
 };

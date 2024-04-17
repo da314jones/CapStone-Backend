@@ -22,14 +22,13 @@ CREATE TABLE videos (
     title VARCHAR(255) DEFAULT 'Untitled',
     summary TEXT DEFAULT 'Summary not available',
     ai_summary TEXT DEFAULT 'Summary not available',
-    signed_url TEXT, 
+    thumbnail_signed_url TEXT, 
     is_private BOOLEAN DEFAULT TRUE, 
     s3_key VARCHAR (255),
     thumbnail_key VARCHAR (255),
     source VARCHAR DEFAULT 'Vonage',
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    video_signed_url TEXT
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
 
