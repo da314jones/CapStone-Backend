@@ -9,13 +9,21 @@ import {
   ListObjectsV2Command,
   GetObjectCommand,
   HeadObjectCommand,
+  PutObjectCommand
 } from "@aws-sdk/client-s3";
 import { generateThumbnail } from "../utilityService/imageService.js";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
+import { parseUrl } from "@smithy/url-parser";
+import { formatUrl } from "@aws-sdk/util-format-url";
+import { Hash } from "@smithy/hash-node";
+import https from "https";
+import { fromIni } from "@aws-sdk/credential-providers";
+import { HttpRequest } from "@smithy/protocol-http";
 import {
   createVideoEntry,
   checkAndInsertUser,
   insertVideoMetadata,
+  getSignedUrlsForPng,
   getAllVideos,
 } from "../queries/videos.js";
 
@@ -222,43 +230,77 @@ export const stopVideoRecording = async (req, res) => {
   }
 };
 
-export async function processS3Objects(db) {
-  try {
-      const listParams = { Bucket: BUCKET_NAME };
-      const listData = await s3Client.send(new ListObjectsV2Command(listParams));
-
-      for (const object of listData.Contents) {
-          const headParams = { Bucket: BUCKET_NAME, Key: object.Key };
-          const metaData = await s3Client.send(new HeadObjectCommand(headParams));
-          const metadataContent = metaData.Metadata;
-
-          if (metadataContent && metadataContent.user) {
-              const userData = JSON.parse(metadataContent.user);
-              await checkAndInsertUser(metadataContent.user);
-              const videoData = {
-                  user_id: userData.user_id,
-                  firstName: userData.firstName, 
-                  lastName: userData.lastName,   
-                  email: userData.email,         
-                  photo_url: userData.photo_url,
-                  created_at: userData.created_at, 
-                  category: metadataContent.category,
-                  title: metadataContent.title,
-                  summary: metadataContent.summary,
-                  isprivate: metadataContent.isprivate,
-                  source: metadataContent.source,
-                  s3_key: object.Key,
-                  thumbnail_key: object.Key.replace('.mp4', '.png') 
-              };
-              await insertVideoMetadata(videoData);
-          }
-      }
-      console.log("All S3 objects processed successfully.");
-  } catch (error) {
-      console.error("Error processing S3 objects:", error);
-      // Handle the error appropriately
+const getS3SignedUrls = async (keys) => {
+  const signedUrls = [];
+  for (const key of keys) {
+    try {
+      const url = await getSignedUrl(
+        s3Client,
+        new GetObjectCommand({
+          Bucket: process.env.BUCKET_NAME,
+          Key: key
+        }),
+        { expiresIn: 86400 } 
+      );
+      signedUrls.push({ key, url });
+    } catch (error) {
+      console.error(`Error generating signed URL for key ${key}:`, error);
+    }
   }
+  return signedUrls;
+};
+
+export async function processS3Objects(req, res) {
+    try {
+        const listParams = { Bucket: process.env.BUCKET_NAME };
+        const listData = await s3Client.send(new ListObjectsV2Command(listParams));
+        const processedData = [];
+
+        for (const object of listData.Contents) {
+            const headParams = { Bucket: process.env.BUCKET_NAME, Key: object.Key };
+            const metaData = await s3Client.send(new HeadObjectCommand(headParams));
+            const metadataContent = metaData.Metadata;
+
+            if (metadataContent && metadataContent.user) {
+                const userData = JSON.parse(metadataContent.user);
+                await checkAndInsertUser(metadataContent.user); // assuming this processes or logs the user data
+                const videoData = {
+                    user_id: userData.user_id,
+                    firstName: userData.firstName,
+                    lastName: userData.lastName,
+                    email: userData.email,
+                    photo_url: userData.photo_url,
+                    created_at: userData.created_at,
+                    category: metadataContent.category,
+                    title: metadataContent.title,
+                    summary: metadataContent.summary,
+                    isPrivate: metadataContent.isprivate,
+                    source: metadataContent.source,
+                    s3_key: object.Key,
+                    thumbnail_key: object.Key.replace('.mp4', '.png')
+                };
+                await insertVideoMetadata(videoData);
+
+                const videoUrl = await getSignedUrl(s3Client, new GetObjectCommand({ Bucket: process.env.BUCKET_NAME, Key: videoData.s3_key }), { expiresIn: 86400 });
+                const thumbnailUrl = await getSignedUrl(s3Client, new GetObjectCommand({ Bucket: process.env.BUCKET_NAME, Key: videoData.thumbnail_key }), { expiresIn: 86400 });
+
+                processedData.push({
+                    ...videoData,
+                    videoUrl,
+                    thumbnailUrl
+                });
+            }
+        }
+
+        res.json({ processedData });        
+    } catch (error) {
+        console.error("Error processing S3 objects:", error);
+        throw new Error("Failed to process S3 objects");
+    }
 }
+
+
+
 
 
 

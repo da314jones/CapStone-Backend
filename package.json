@@ -15,6 +15,7 @@
   "license": "ISC",
   "dependencies": {
     "@aws-sdk/client-s3": "^3.552.0",
+    "@aws-sdk/credential-providers": "^3.556.0",
     "@aws-sdk/lib-storage": "^3.552.0",
     "@aws-sdk/s3-request-presigner": "^3.535.0",
     "admin": "^1.4.1",
