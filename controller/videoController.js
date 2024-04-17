@@ -1,4 +1,3 @@
-// videoController.js
 import dotenv from "dotenv";
 dotenv.config();
 import fetch from "node-fetch";
@@ -7,14 +6,17 @@ import fs from "fs";
 import path from "path";
 import {
   S3Client,
+  ListObjectsV2Command,
   GetObjectCommand,
+  HeadObjectCommand,
 } from "@aws-sdk/client-s3";
 import { generateThumbnail } from "../utilityService/imageService.js";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import {
   createVideoEntry,
+  checkAndInsertUser,
+  insertVideoMetadata,
   getAllVideos,
-  getAllThumbnails,
 } from "../queries/videos.js";
 
 const videoPath = process.env.VIDEO_PATH;
@@ -39,6 +41,7 @@ const s3Client = new S3Client({
     secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
   },
 });
+const BUCKET_NAME = process.env.BUCKET_NAME
 
 export const creatingSession = async (req, res) => {
   opentok.createSession({ mediaMode: "routed" }, function (error, session) {
@@ -126,12 +129,8 @@ export const startVideoRecording = async (req, res) => {
 
 const downloadArchive = async (archiveUrl, archiveId) => {
   const filename = `${archiveId}.mp4`;
-  const filePath =
-    "/Users/djones/Desktop/working-repository/10.2/MODULE_6_CAPSTONE/Tidbits/CapStone-Backend/videos/" +
-    filename;
-
-  const directory =
-    "/Users/djones/Desktop/working-repository/10.2/MODULE_6_CAPSTONE/Tidbits/CapStone-Backend/videos";
+  const directory = "./videos/";
+  const filePath = directory + filename;
 
   try {
     await fs.promises.mkdir(directory, { recursive: true });
@@ -223,31 +222,49 @@ export const stopVideoRecording = async (req, res) => {
   }
 };
 
-export const listThumbnails = async (req, res) => {
+export async function processS3Objects(db) {
   try {
-    const thumbnails = await getAllThumbnails();  
-    const thumbnailSignedUrls = await Promise.all(
-      thumbnails.map(async (thumbnail) => {
-        const signedUrl = await getSignedUrl(
-          s3Client,
-          new GetObjectCommand({
-            Bucket: process.env.BUCKET_NAME,
-            Key: thumbnail.thumbnail_key,
-          }),
-          { expiresIn: 3600 } 
-        );
-        return {
-          ...thumbnail,
-          signedUrl,
-        };
-      })
-    );
-    res.json({ thumbnailSignedUrls });
+      const listParams = { Bucket: BUCKET_NAME };
+      const listData = await s3Client.send(new ListObjectsV2Command(listParams));
+
+      for (const object of listData.Contents) {
+          const headParams = { Bucket: BUCKET_NAME, Key: object.Key };
+          const metaData = await s3Client.send(new HeadObjectCommand(headParams));
+          const metadataContent = metaData.Metadata;
+
+          if (metadataContent && metadataContent.user) {
+              const userData = JSON.parse(metadataContent.user); // Parse the user data JSON string
+              await checkAndInsertUser(metadataContent.user); // Pass the entire user object as a JSON string
+              const videoData = {
+                  user_id: userData.user_id,
+                  firstName: userData.firstName, // Extract firstName from user data
+                  lastName: userData.lastName,   // Extract lastName from user data
+                  email: userData.email,         // Extract email from user data
+                  photo_url: userData.photo_url, // Extract photo_url from user data
+                  created_at: userData.created_at, // Extract created_at from user data
+                  category: metadataContent.category,
+                  title: metadataContent.title,
+                  summary: metadataContent.summary,
+                  isprivate: metadataContent.isprivate,
+                  source: metadataContent.source,
+                  s3_key: object.Key,
+                  thumbnail_key: object.Key.replace('.mp4', '.png') 
+              };
+              await insertVideoMetadata(videoData);
+          }
+      }
+      console.log("All S3 objects processed successfully.");
   } catch (error) {
-    console.error("Error listing thumbnails:", error);
-    res.status(500).json({ message: "Failed to list thumbnails", error: error.toString() });
+      console.error("Error processing S3 objects:", error);
+      // Handle the error appropriately
   }
-};
+}
+
+
+
+
+
+
 
 
 export const allVideos = async (req, res) => {
@@ -270,7 +287,7 @@ export const allVideos = async (req, res) => {
             Bucket: process.env.BUCKET_NAME,
             Key: video.thumbnail_key,
           }),
-          { expiresIn: 3600 }
+          { expiresIn: 86400 }
         );
 
         return {
@@ -304,45 +321,12 @@ const videoByTitle = async (req, res) => {
 };
 
 
-// export const updateVideoDetails = async (req, res) => {
-//   const { archiveId } = req.params;
-//   const { title, summary, is_private, signed_url } = req.body;
-
-//   try {
-//     const updatedVideo = await updateVonageVideoMetadata(archiveId, { title, summary, is_private, signed_url });
-//     res.json(updatedVideo);
-//   } catch (error) {
-//     res.status(500).json({ message: "Failed to update video metadata", error });
-//   }
-// };
-
-// const deleteVideoMetadata = async (req, res) => {
-//   const videoId = req.params.id;
-//   try {
-//     const deletedVideo = await deleteVideo(videoId);
-//     if (deletedVideo) {
-//       res.json({ message: "Video deleted successfully", video: deletedVideo });
-//     } else {
-//       res.status(404).json("Video not found c");
-//     }
-//   } catch (error) {
-//     console.error("Error deleting video c:", error);
-//     res.status(500).json("Error deleting video c");
-//   }
-// };
-
 export default {
   allVideos,
   videoByTitle,
   creatingSession,
   generatingToken,
   startVideoRecording,
-  stopVideoRecording,
-  listThumbnails,
   downloadArchive,
-  // updateVideoDetails,
-  // deleteVideoMetadata,
+  stopVideoRecording,
 };
-
-
-
