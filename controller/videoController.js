@@ -14,6 +14,8 @@ import { generateThumbnail } from "../utilityService/imageService.js";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import {
   createVideoEntry,
+  checkAndInsertUser,
+  insertVideoMetadata,
   getAllVideos,
 } from "../queries/videos.js";
 
@@ -220,54 +222,45 @@ export const stopVideoRecording = async (req, res) => {
   }
 };
 
-
-export const processS3Objects = async (req, res) => {
-  let isTruncated = true;
-  let continuationToken;
-
+export async function processS3Objects(db) {
   try {
-    const allObjects = [];
-    while (isTruncated) {
-      const listParams = {
-        Bucket: BUCKET_NAME,
-        ContinuationToken: continuationToken
-      };
-
-      const listCommand = new ListObjectsV2Command(listParams);
-      const listData = await s3Client.send(listCommand);
+      const listParams = { Bucket: BUCKET_NAME };
+      const listData = await s3Client.send(new ListObjectsV2Command(listParams));
 
       for (const object of listData.Contents) {
-        const headParams = {
-          Bucket: BUCKET_NAME,
-          Key: object.Key
-        };
-        console.log("Batch of objects:", listData.Contents);
-        
-        const headCommand = new HeadObjectCommand(headParams);
-        const metaData = await s3Client.send(headCommand);
+          const headParams = { Bucket: BUCKET_NAME, Key: object.Key };
+          const metaData = await s3Client.send(new HeadObjectCommand(headParams));
+          const metadataContent = metaData.Metadata;
 
-        console.log("Metadata for object", object.Key, ":", metaData);
-        allObjects.push({
-          Key: object.Key,
-          LastModified: object.LastModified,
-          Size: object.Size,
-          ContentType: metaData.ContentType,
-          Metadata: metaData.Metadata,
-          ETag: object.ETag,
-          StorageClass: object.StorageClass
-        });
+          if (metadataContent && metadataContent.user) {
+              const userData = JSON.parse(metadataContent.user); // Parse the user data JSON string
+              await checkAndInsertUser(metadataContent.user); // Pass the entire user object as a JSON string
+              const videoData = {
+                  user_id: userData.user_id,
+                  firstName: userData.firstName, // Extract firstName from user data
+                  lastName: userData.lastName,   // Extract lastName from user data
+                  email: userData.email,         // Extract email from user data
+                  photo_url: userData.photo_url, // Extract photo_url from user data
+                  created_at: userData.created_at, // Extract created_at from user data
+                  category: metadataContent.category,
+                  title: metadataContent.title,
+                  summary: metadataContent.summary,
+                  isprivate: metadataContent.isprivate,
+                  source: metadataContent.source,
+                  s3_key: object.Key,
+                  thumbnail_key: object.Key.replace('.mp4', '.png') 
+              };
+              await insertVideoMetadata(videoData);
+          }
       }
-
-      isTruncated = listData.IsTruncated;
-      continuationToken = listData.NextContinuationToken;
-    }
-
-    res.json(allObjects);
-  } catch (err) {
-    console.error("Error in fetching objects or metadata:", err);
-    res.status(500).send("Failed to retrieve objects and metadata from S3");
+      console.log("All S3 objects processed successfully.");
+  } catch (error) {
+      console.error("Error processing S3 objects:", error);
+      // Handle the error appropriately
   }
-};
+}
+
+
 
 
 

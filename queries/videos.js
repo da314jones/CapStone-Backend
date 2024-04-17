@@ -160,36 +160,50 @@ const updateDatabaseWithVideoAndThumbnail = async (archiveId, videoS3Key, thumbn
   }
 };
 
-
-const checkUserFromMetadata = async (req, res) => {
-  const objectKey = req.params.key;
-
-  try {
-    const headParams = {
-      Bucket: bucketName,
-      Key: objectKey,
-    };
-
-    const { Metadata } = await s3Client.send(new HeadObjectCommand(headParams));
-    if (!Metadata.user) {
-      return res.status(404).json({ message: "No user metadata available" });
-    }
-
-    const userMetadata = JSON.parse(Metadata.user);
-    const userId = userMetadata.user_id;
-
-    console.log("Extracted User ID:", userId);
-    const userData = await db.oneOrNone('SELECT * FROM users WHERE user_id = $1', [userId]);
-    if (userData) {
-      res.json({ message: "User exists", userData });
-    } else {
-      res.status(404).json({ message: "User does not exist" });
-    }
-  } catch (err) {
-    console.error("Error during S3 metadata retrieval or database query:", err);
-    res.status(500).send("Failed to retrieve user information");
+const checkAndInsertUser = async (userData) => {
+  const { user_id, firstName, lastName, email, photo_url, created_at } = JSON.parse(userData);
+  const userExists = await db.oneOrNone('SELECT 1 FROM users WHERE user_id = $1', [user_id]);
+  if (!userExists) {
+    await db.none(
+      'INSERT INTO users (user_id, "firstName", "lastName", email, photo_url, created_at) VALUES ($1, $2, $3, $4, $5, $6)',
+      [user_id, firstName, lastName, email, photo_url, created_at]
+    );
+    console.log(`Inserted new user with ID: ${user_id}`);
+  } else {
+    console.log(`User with ID: ${user_id} already exists.`);
   }
-};
+}
+
+
+const insertVideoMetadata = async (videoData) => {
+  const { user_id, category, title, summary, isprivate, source, s3_key, thumbnail_key } = videoData;
+  await db.none(
+    `INSERT INTO videos (user_id, category, title, summary, is_private, source, s3_key, thumbnail_key, created_at, updated_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
+    [user_id, category, title, summary, isprivate === 'true', source, s3_key, thumbnail_key]
+  );
+  console.log(`Video metadata inserted for user ID: ${user_id}`);
+}
+
+export async function getSignedUrlsForPng(db) {
+  try {
+      const query = `
+          SELECT s3_key
+          FROM videos
+          WHERE s3_key LIKE '%.png';
+      `;
+      const result = await db.any(query);
+      const s3Keys = result.map(row => row.s3_key);
+      return s3Keys;
+  } catch (error) {
+      console.error("Error fetching S3 keys for PNG files:", error);
+      throw error; 
+  }
+}
+
+
+
+
 
 
 //confirmed for local
@@ -231,6 +245,8 @@ const ensureUserInDatabase = async (metadata) => {
     throw error;
   }
 };
+
+
 
 
 const insertVideoEntry = async (videoData) => {
@@ -393,7 +409,10 @@ export {
   getVideoByArchiveId,
   updateVideoRecord,
   updateArchiveIdForUser,
-  updateDatabaseWithVideoAndThumbnail,  getAllThumbnails,
+  updateDatabaseWithVideoAndThumbnail,
+  getAllThumbnails,
+  checkAndInsertUser,
+  insertVideoMetadata,
   getAllVideos,
   insertVideoEntry,
   ensureUserInDatabase,
