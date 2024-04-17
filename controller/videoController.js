@@ -2,7 +2,7 @@ import dotenv from "dotenv";
 dotenv.config();
 import fetch from "node-fetch";
 import OpenTok from "opentok";
-import fs from "fs";
+import fs, { rmSync } from "fs";
 import path from "path";
 import {
   S3Client,
@@ -230,31 +230,11 @@ export const stopVideoRecording = async (req, res) => {
   }
 };
 
-const getS3SignedUrls = async (keys) => {
-  const signedUrls = [];
-  for (const key of keys) {
-    try {
-      const url = await getSignedUrl(
-        s3Client,
-        new GetObjectCommand({
-          Bucket: process.env.BUCKET_NAME,
-          Key: key
-        }),
-        { expiresIn: 86400 } 
-      );
-      signedUrls.push({ key, url });
-    } catch (error) {
-      console.error(`Error generating signed URL for key ${key}:`, error);
-    }
-  }
-  return signedUrls;
-};
-
 export async function processS3Objects(req, res) {
     try {
         const listParams = { Bucket: process.env.BUCKET_NAME };
         const listData = await s3Client.send(new ListObjectsV2Command(listParams));
-        const processedData = [];
+        const thumbnailIamge = [];
 
         for (const object of listData.Contents) {
             const headParams = { Bucket: process.env.BUCKET_NAME, Key: object.Key };
@@ -280,24 +260,92 @@ export async function processS3Objects(req, res) {
                     thumbnail_key: object.Key.replace('.mp4', '.png')
                 };
                 await insertVideoMetadata(videoData);
-
-                const videoUrl = await getSignedUrl(s3Client, new GetObjectCommand({ Bucket: process.env.BUCKET_NAME, Key: videoData.s3_key }), { expiresIn: 86400 });
                 const thumbnailUrl = await getSignedUrl(s3Client, new GetObjectCommand({ Bucket: process.env.BUCKET_NAME, Key: videoData.thumbnail_key }), { expiresIn: 86400 });
+                const videoUrl = await getSignedUrl(s3Client, new GetObjectCommand({ Bucket: process.env.BUCKET_NAME, Key: videoData.s3_key }), { expiresIn: 86400 });
+                console.log(getSignedVideoUrl(videoUrl))
 
-                processedData.push({
+                thumbnailIamge.push({
                     ...videoData,
-                    videoUrl,
+                    // videoUrl,
                     thumbnailUrl
+
                 });
             }
         }
 
-        res.json({ processedData });        
+        res.json({ thumbnailIamge });        
     } catch (error) {
         console.error("Error processing S3 objects:", error);
         throw new Error("Failed to process S3 objects");
     }
+};
+
+// export const getSignedVideoUrl = async (videoUrl) => {
+//   const thumbnailKey = req.params.key;
+//   const thumbnailKeyPrep = thumbnailKey.split("/").pop();
+//   const deconstructKey = thumbnailKeyPrep.split(".");
+//   let videoKey = deconstructKey.slice(0, -1).join('.') + ".mp4";
+
+//   console.log("Full video key:", videoKey);
+
+//   if (!videoKey) {
+//     return res.status(400).json({ error: "Video key is required." });
+//   }
+
+//   try {
+//     const signedUrl = await getSignedUrl(
+//       s3Client,
+//       new GetObjectCommand({
+//         Bucket: process.env.BUCKET_NAME,
+//         Key: videoKey
+//       }),
+//       { expiresIn: 3600 }
+//     );
+
+//     console.log(signedUrl);
+//     return res.json({ signedUrl }); 
+//   } catch (error) {
+//     console.error("Error generating signed URL:", error);
+//     res.status(500).json({ message: "Failed to generate signed URL", error: error.toString() });
+//   }
+// };
+
+
+export const getSignedVideoUrl = async (videoKey) => {
+  // Ensure videoKey is provided
+  if (!videoKey) {
+    throw new Error("Video key is required.");
+  }
+
+  try {
+    const signedUrl = await getSignedUrl(
+      s3Client,
+      new GetObjectCommand({
+        Bucket: process.env.BUCKET_NAME,
+        Key: videoKey
+      }),
+      { expiresIn: 3600 }
+    );
+
+    console.log("Signed URL:", signedUrl);
+    return signedUrl;
+  } catch (error) {
+    console.error("Error generating signed URL:", error);
+    throw new Error("Failed to generate signed URL");
+  }
+};
+
+const hardcodedVideoKey = "user/5WxAZrN6AlWGV4LFuRAmrDU1Z5F2/test.mp4";
+
+try {
+  const signedUrl = await getSignedVideoUrl(hardcodedVideoKey);
+  console.log("Signed URL:", signedUrl);
+  // Now you can use the signed URL to play the video
+} catch (error) {
+  console.error("Failed to retrieve signed URL:", error);
+  // Handle the error appropriately
 }
+
 
 
 
@@ -369,6 +417,8 @@ export default {
   creatingSession,
   generatingToken,
   startVideoRecording,
+  processS3Objects,
+  getSignedVideoUrl,
   downloadArchive,
   stopVideoRecording,
 };

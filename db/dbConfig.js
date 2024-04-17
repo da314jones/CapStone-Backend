@@ -4,6 +4,7 @@ import dotenv from "dotenv"
 const pgp = pgPromise({});
 dotenv.config()
 
+const DATABASE_URL = process.env.DATABASE_URL
 const cn = {
     host: process.env.PG_HOST, 
     port: process.env.PG_PORT, 
