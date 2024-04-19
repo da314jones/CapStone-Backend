@@ -18,6 +18,7 @@ const s3Client = new S3Client({
   },
 });
 
+// uploads file to S3 bucket and with metadata defaults
 const uploadFileToS3 = async (filePath, s3Key, metadata, userEntry) => {
   const fileStream = fs.createReadStream(filePath);
   const uploadParams = {
@@ -46,6 +47,7 @@ const uploadFileToS3 = async (filePath, s3Key, metadata, userEntry) => {
   }
 };
 
+// deletes temporary download archive file for processing
 const deleteFile = (filePath) => {
   try {
     fs.unlink(filePath, (err) => {
@@ -60,9 +62,11 @@ const deleteFile = (filePath) => {
   }
 };
 
+//  process temporary archive file
 const processVideoData = async (req, res) => {
   const { archiveId } = req.params;
   const formData = req.body;
+  // retrieves archiveId
   const videoDetails = await getVideoByArchiveId(archiveId);
   const userId = videoDetails.user_id;
   const userEntry = await getUserById(userId);
@@ -77,6 +81,7 @@ const processVideoData = async (req, res) => {
       .json({ message: "Video not found with archiveId: " + archiveId });
   }
 
+  // santitizes all encoded characters and simplifies title and key configuration
   const sanitizedTitle = formData.title.replace(/[^a-zA-Z0-9-_]+/g, "-");
   const videoS3Key = `user/${userId}/${sanitizedTitle}.mp4`;
   const thumbnailS3Key = `user/${userId}/${sanitizedTitle}.png`;
@@ -85,13 +90,15 @@ const processVideoData = async (req, res) => {
 
   try {
     const [videoUploadResult, thumbnailUploadResult] = await Promise.all([
+      // uploads final process of video object
       uploadFileToS3(videoFilePath, videoS3Key, formData, userEntry),
       uploadFileToS3(thumbnailFilePath, thumbnailS3Key, formData, userEntry),
     ]);
-
+// executes delets of temp video and thumbnail file
     deleteFile(videoFilePath);
     deleteFile(thumbnailFilePath);
 
+    // updates thumbnail and video S3 keys to db
     const updatedRecord = await updateDatabaseWithVideoAndThumbnail(
       archiveId,
       videoS3Key,

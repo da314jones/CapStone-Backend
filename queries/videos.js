@@ -37,10 +37,6 @@ const getUserById = async (userId) => {
   }
 };
 
-
-
-
-
 //confirmed usage
 const createVideoEntry = async (userId, archiveId) => {
   if (!userId || !archiveId) {
@@ -61,7 +57,6 @@ const createVideoEntry = async (userId, archiveId) => {
     throw error;
   }
 };
-
 
 async function createS3UsersVideoEntry(videoData) {
   try {
