@@ -51,15 +51,20 @@ const s3Client = new S3Client({
 const BUCKET_NAME = process.env.BUCKET_NAME
 
 export const creatingSession = async (req, res) => {
-  opentok.createSession({ mediaMode: "routed" }, function (error, session) {
-    if (error) {
-      console.error("Error creating session:", error);
-      return res.status(500).json("Failed to create session");
-    } else {
-      console.log("Session ID:", session.sessionId);
-      res.json({ sessionId: session.sessionId });
-    }
-  });
+  try {
+    opentok.createSession({ mediaMode: "routed" }, function (error, session) {
+      if (error) {
+        console.error("Error creating session:", error);
+        return res.status(500).json("Failed to create session");
+      } else {
+        console.log("Session ID:", session.sessionId);
+        res.json({ sessionId: session.sessionId });
+      }
+    });
+  } catch (error) {
+    console.error('Error creating session:', error);
+    return res.status(500).json('Failed to create session');
+  }
 };
 
 export const generatingToken = async (req, res) => {
