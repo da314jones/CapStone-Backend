@@ -21,6 +21,13 @@ const s3Client = new S3Client({
 // uploads file to S3 bucket and with metadata defaults
 const uploadFileToS3 = async (filePath, s3Key, metadata, userEntry) => {
   const fileStream = fs.createReadStream(filePath);
+  let contentType = 'video/mp4';
+  if (s3Key.endsWith('png')){
+    contentType = 'image/png';
+  } else if (s3Key,endsWith('.jpg') || s3Key.endsWith('.jpg')) {
+    contentType = 'image/jpeg';
+  }
+
   const uploadParams = {
     Bucket: process.env.BUCKET_NAME,
     Key: s3Key,
@@ -33,6 +40,7 @@ const uploadFileToS3 = async (filePath, s3Key, metadata, userEntry) => {
       source: metadata.source || "Vonage",
       user: JSON.stringify(userEntry),
     },
+    ContentType: contentType,
   };
 
   try {
@@ -83,16 +91,13 @@ const processVideoData = async (req, res) => {
 
   // santitizes all encoded characters and simplifies title and key configuration
   const sanitizedTitle = formData.title.replace(/[^a-zA-Z0-9-_]+/g, "-");
-  const videoS3Key = `user/${userId}/${sanitizedTitle}.mp4`;
-  const thumbnailS3Key = `user/${userId}/${sanitizedTitle}.png`;
   const videoFilePath = path.join("videos", `${archiveId}.mp4`);
   const thumbnailFilePath = path.join("thumbnails", `${archiveId}.png`);
 
   try {
     const [videoUploadResult, thumbnailUploadResult] = await Promise.all([
-      // uploads final process of video object
-      uploadFileToS3(videoFilePath, videoS3Key, formData, userEntry),
-      uploadFileToS3(thumbnailFilePath, thumbnailS3Key, formData, userEntry),
+      uploadFileToS3(videoFilePath, `user/${userId}/${sanitizedTitle}.mp4`, formData, userEntry),
+      uploadFileToS3(thumbnailFilePath, `user/${userId}/${sanitizedTitle}.png`, formData, userEntry),
     ]);
 // executes delets of temp video and thumbnail file
     deleteFile(videoFilePath);

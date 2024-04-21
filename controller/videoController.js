@@ -23,7 +23,6 @@ import {
   createVideoEntry,
   checkAndInsertUser,
   insertVideoMetadata,
-  getSignedUrlsForPng,
   getAllVideos,
 } from "../queries/videos.js";
 
@@ -53,15 +52,20 @@ const BUCKET_NAME = process.env.BUCKET_NAME
 
 //creates a session with vonage to recieve a session id
 export const creatingSession = async (req, res) => {
-  opentok.createSession({ mediaMode: "routed" }, function (error, session) {
-    if (error) {
-      console.error("Error creating session:", error);
-      return res.status(500).json("Failed to create session");
-    } else {
-      console.log("Session ID:", session.sessionId);
-      res.json({ sessionId: session.sessionId });
-    }
-  });
+  try {
+    opentok.createSession({ mediaMode: "routed" }, function (error, session) {
+      if (error) {
+        console.error("Error creating session:", error);
+        return res.status(500).json("Failed to create session");
+      } else {
+        console.log("Session ID:", session.sessionId);
+        res.json({ sessionId: session.sessionId });
+      }
+    });
+  } catch (error) {
+    console.error('Error creating session:', error);
+    return res.status(500).json('Failed to create session');
+  }
 };
 
 //recieves session id and fetches a token from vonage
@@ -213,27 +217,26 @@ const getArchiveUrlAndSaveVideo = async (archiveId) => {
 export const stopVideoRecording = async (req, res) => {
   const { archiveId, user_id } = req.body;
   try {
-    const archive = await new Promise((resolve, reject) => {
-      opentok.stopArchive(archiveId, (error, archive) => {
-        if (error) {
-          reject(new Error(error.message || "Internal Server Error"));
-        } else {
-          resolve(archive);
-        }
+      const archive = await new Promise((resolve, reject) => {
+          opentok.stopArchive(archiveId, (error, archive) => {
+              if (error) {
+                  reject(new Error(error.message || "Internal Server Error"));
+              } else {
+                  resolve(archive);
+              }
+          });
       });
-    });
-    //get archive url from video folder and create thumbailusing (ffmpeg)
-    const [response, videoPath] = await getArchiveUrlAndSaveVideo(archiveId);
-    const thumbnailPath = await generateThumbnail(videoPath, archiveId);
-    res.json({
-      message: "Recording and thumbnail processed successfully",
-      details: { videoPath, thumbnailPath, archiveId },
-    });
+      const [response, videoPath] = await getArchiveUrlAndSaveVideo(archiveId);
+      const thumbnailPath = await generateThumbnail(videoPath, archiveId);
+      res.json({
+          message: "Recording and thumbnail processed successfully",
+          details: { videoPath, thumbnailPath, archiveId },
+      });
   } catch (error) {
-    console.error("Failed to stop recording:", error);
-    res
-      .status(500)
-      .json({ message: "Failed to stop recording", error: error.toString() });
+      console.error("Failed to stop recording:", error);
+      res
+          .status(500)
+          .json({ message: "Failed to stop recording", error: error.toString() });
   }
 };
 
@@ -284,7 +287,7 @@ export async function processS3Objects(req, res) {
         res.json({ thumbnailImage });        
     } catch (error) {
         console.error("Error processing S3 objects:", error);
-        throw new Error("Failed to process S3 objects");
+        res.status(500).json({ message: "Failed to process S3 objects", error: error.toString() });
     }
 };
 
@@ -293,7 +296,7 @@ export const getSignedVideoUrl = async (req, res) => {
   const thumbanilDestructured = req.body.thumbnail;
   
   if (!thumbanilDestructured) {
-    throw new Error("thumbnail key is required.");
+    return res.status(400).json({ error: "thumbnail key is required." });
   }
 
   try {
@@ -314,7 +317,7 @@ export const getSignedVideoUrl = async (req, res) => {
     }) ;
   } catch (error) {
     console.error("Error generating signed URL:", error);
-    throw new Error("Failed to generate signed URL");
+    res.status(500).json({ message: "Failed to generate signed URL", error: error.toString() });
   }
 };
 // try {
