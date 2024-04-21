@@ -50,6 +50,7 @@ const s3Client = new S3Client({
 });
 const BUCKET_NAME = process.env.BUCKET_NAME
 
+//creates a session with vonage to recieve a session id
 export const creatingSession = async (req, res) => {
   try {
     opentok.createSession({ mediaMode: "routed" }, function (error, session) {
@@ -67,6 +68,7 @@ export const creatingSession = async (req, res) => {
   }
 };
 
+//recieves session id and fetches a token from vonage
 export const generatingToken = async (req, res) => {
   const sessionId = req.params.sessionId;
   try {
@@ -83,6 +85,7 @@ export const generatingToken = async (req, res) => {
   }
 };
 
+//starts video archive recording
 export const startVideoRecording = async (req, res) => {
   const { sessionId, user_id } = req.body;
 
@@ -138,7 +141,7 @@ export const startVideoRecording = async (req, res) => {
       });
   }
 };
-
+ //downloads the recording to video folder
 const downloadArchive = async (archiveUrl, archiveId) => {
   const filename = `${archiveId}.mp4`;
   const directory = "./videos/";
@@ -177,8 +180,10 @@ const downloadArchive = async (archiveUrl, archiveId) => {
   }
 };
 
+// times out download execution to check for archive availability
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
+//checks availability of archive to download
 const checkArchiveAvailability = async (archiveId, retries = 10) => {
   if (retries === 0) {
     throw new Error("Archive not available after maximum retries");
@@ -199,6 +204,7 @@ const checkArchiveAvailability = async (archiveId, retries = 10) => {
   }
 };
 
+//save  vonage url and video check availibility and download actual archive
 const getArchiveUrlAndSaveVideo = async (archiveId) => {
   const response = await checkArchiveAvailability(archiveId);
   if (!response.status) {
@@ -206,8 +212,8 @@ const getArchiveUrlAndSaveVideo = async (archiveId) => {
   }
   const videoFile = await downloadArchive(response.url, archiveId);
   return [response, videoFile];
-};
 
+};//stop recording
 export const stopVideoRecording = async (req, res) => {
   const { archiveId, user_id } = req.body;
   try {
@@ -234,6 +240,7 @@ export const stopVideoRecording = async (req, res) => {
   }
 };
 
+//process of s3 keys and metadata
 export async function processS3Objects(req, res) {
     try {
         const listParams = { Bucket: BUCKET_NAME };
@@ -247,6 +254,7 @@ export async function processS3Objects(req, res) {
 
             if (metadataContent && metadataContent.user) {
                 const userData = JSON.parse(metadataContent.user);
+                // checks if user exist in video row(db) (do nothing) if (!user) creates one based
                 await checkAndInsertUser(metadataContent.user);
                 const videoData = {
                     user_id: userData.user_id,
@@ -263,6 +271,7 @@ export async function processS3Objects(req, res) {
                     s3_key: object.Key,
                     thumbnail_key: object.Key.replace('.mp4', '.png')
                 };
+                //adds users table metadata to the db and thumbnail
                 await insertVideoMetadata(videoData);
                 const thumbnailUrl = await getSignedUrl(s3Client, new GetObjectCommand({ Bucket: BUCKET_NAME, Key: videoData.thumbnail_key }), { expiresIn: 86400 });
 
@@ -282,6 +291,7 @@ export async function processS3Objects(req, res) {
     }
 };
 
+// retrieves S3 key and creates a signed url that allows access to thumbnail
 export const getSignedVideoUrl = async (req, res) => {
   const thumbanilDestructured = req.body.thumbnail;
   
@@ -319,7 +329,7 @@ export const getSignedVideoUrl = async (req, res) => {
 //   console.error("Failed to retrieve signed URL:", error);
 // }
 
-
+// retrieves a signed url
 export const retrieveSignedVideoUrl = async (req, res) => {
   const { videoKey } = req.body;
 
@@ -358,7 +368,7 @@ export const retrieveSignedVideoUrl = async (req, res) => {
 
 
 
-
+// not integrated
 export const allVideos = async (req, res) => {
   try {
     const videos = await getAllVideos();

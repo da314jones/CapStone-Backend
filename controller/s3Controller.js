@@ -29,6 +29,7 @@ const s3Client = new S3Client({
   },
 });
 
+// uploads files to S3 bucket  via following key configuration user/${userId}/fileName   (.mp4  or  .png)
 const uploadToS3 = async (filePath, key, metadata) => {
   const fileStream = fs.createReadStream(filePath);
   const uploadParams = {
@@ -48,6 +49,7 @@ const uploadToS3 = async (filePath, key, metadata) => {
   }
 };
 
+// file buffer for local upload
  const uploadBufferToS3 = async (buffer, metaDataObject) => {
   const { user_id, title, ...rest }  = metaDataObject;
   const fileName = `${title}.mp4`;
@@ -73,7 +75,7 @@ const uploadToS3 = async (filePath, key, metadata) => {
   }
 };
 
-
+//  updates video object with file metadata
 export const uploadFile = async (req, res) => {
   const { file } = req;
   const metaDataObject = req.body;
@@ -136,6 +138,7 @@ export const uploadFile = async (req, res) => {
   }
 };
 
+// downloads file to form S3 bucket for local files
 export const downloadFile = async (req, res) => {
   console.log("Controller: downloadFile called for", req.params.filename);
   const { filename, title } = req.params;
@@ -162,6 +165,7 @@ export const downloadFile = async (req, res) => {
   }
 };
 
+// delete file logic not integrated
 export const deleteFile = async (req, res) => {
   console.log("Controller: deleteFile called for", req.params.filename);
   const params = {
@@ -183,8 +187,7 @@ export const deleteFile = async (req, res) => {
   }
 };
 
-
-
+// S3 default List command of video and thumbnail S3keys
 export const listFiles = async (req, res) => {
   const params = {
     Bucket: process.env.BUCKET_NAME,
