@@ -24,7 +24,7 @@ const uploadFileToS3 = async (filePath, s3Key, metadata, userEntry) => {
   let contentType = 'video/mp4';
   if (s3Key.endsWith('png')){
     contentType = 'image/png';
-  } else if (s3Key,endsWith('.jpg') || s3Key.endsWith('.jpg')) {
+  } else if (s3Key.endsWith('.jpg') || s3Key.endsWith('.jpeg')) {
     contentType = 'image/jpeg';
   }
 
