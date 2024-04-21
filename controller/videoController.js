@@ -293,17 +293,17 @@ export async function processS3Objects(req, res) {
 
 // retrieves S3 key and creates a signed url that allows access to thumbnail
 export const getSignedVideoUrl = async (req, res) => {
-  const thumbanilDestructured = req.body.thumbnail;
+  const thumbnailDestructured = req.body.thumbnail;
   
-  if (!thumbanilDestructured) {
+  if (!thumbnailDestructured) {
     return res.status(400).json({ error: "thumbnail key is required." });
   }
 
   try {
-    const videoKey = new URL(thumbanilDestructured);
+    const videoKey = new URL(thumbnailDestructured);
     const signedUrl = await getSignedUrl(
       s3Client,
-      new GetObjectCommand({
+      new ({
         Bucket: process.env.BUCKET_NAME,
         Key: videoKey
       }),
@@ -376,7 +376,7 @@ export const allVideos = async (req, res) => {
       videos.map(async (video) => {
         const videoSignedUrl = await getSignedUrl(
           s3Client,
-          new GetObjectCommand({
+          new ({
             Bucket: process.env.BUCKET_NAME,
             Key: video.s3_key,
           }),

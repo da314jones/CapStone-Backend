@@ -18,7 +18,7 @@ const s3Client = new S3Client({
   },
 });
 
-// uploads file to S3 bucket and with metadata defaults
+// uploads file to S3 bucket with metadata defaults
 const uploadFileToS3 = async (filePath, s3Key, metadata, userEntry) => {
   const fileStream = fs.createReadStream(filePath);
   let contentType = 'video/mp4';
@@ -95,7 +95,7 @@ const processVideoData = async (req, res) => {
   const thumbnailFilePath = path.join("thumbnails", `${archiveId}.png`);
 
   try {
-    const [videoUploadResult, thumbnailUploadResult] = await Promise.all([
+    const [videoS3Key, thumbnailS3Key] = await Promise.all([
       uploadFileToS3(videoFilePath, `user/${userId}/${sanitizedTitle}.mp4`, formData, userEntry),
       uploadFileToS3(thumbnailFilePath, `user/${userId}/${sanitizedTitle}.png`, formData, userEntry),
     ]);
@@ -119,8 +119,8 @@ const processVideoData = async (req, res) => {
     );
     console.log({
       "DB Update:": updatedRecord,
-      "Video S3 Key:": videoUploadResult,
-      "Thumbnail S3 Key:": thumbnailUploadResult,
+      "Video S3 Key:": videoS3Key,
+      "Thumbnail S3 Key:": thumbnailS3Key,
     });
     res.json({
       message: "Video and thumbnail successfully uploaded and database updated",
@@ -138,3 +138,8 @@ const processVideoData = async (req, res) => {
 export {
   processVideoData
 };
+
+
+
+
+

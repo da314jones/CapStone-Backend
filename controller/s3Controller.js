@@ -94,7 +94,7 @@ export const uploadFile = async (req, res) => {
     Bucket: process.env.BUCKET_NAME,
     Key: `users/${user_id}/${file.originalname}`,
     Body: fileStream,
-    ContentType: file.mimetype,
+    ContentType: 'video/mp4',
     Metadata: {
       user_id: user_id.toString(),
     }, 
